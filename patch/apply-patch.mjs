@@ -6,6 +6,8 @@
  *   POST /api/gacha-forge/more-money/topup     충전(하루 3번): 에테르 · 자금 · 활력 · 반짝이 · 소환권을 지갑에 넣음
  *   POST /api/gacha-forge/more-money/exchange  에테르로 소환권 사기
  *   POST /api/gacha-forge/more-money/codex     도감용 적 이미지 · 전투 배경 목록
+ *   POST /api/gacha-forge/more-money/pass/buy    주간 패스 구매(7일): 바로 받는 보상
+ *   POST /api/gacha-forge/more-money/pass/claim  주간 패스 오늘 보상(하루 한 번, 7일 동안)
  * 그리고 소환이 에테르 대신 소환권을 씁니다: 상시 배너는 「성휘」(상시 소환권), 한정 배너는 「월휘」(한정 소환권).
  * 마리나라는 설치된 패키지 파일의 해시를 검사하므로, 파일과 함께 설치 기록(installed.json)의 해시도 고칩니다.
  *
@@ -44,6 +46,9 @@ const PACKS = {
   "starter": { aether: 1600, funds: 50000, gmmTicketLtd: 1 },
 };
 const DAILY = 3;
+// The weekly pass: bought once (again only after it ends), a gift at once, then a reward every day for 7 days
+// (the day it is bought counts as day 1). Days follow the Marinara server computer's local date.
+const PASS = { days: 7, buy: { gmmTicketLtd: 3 }, daily: { aether: 300, gmmTicketStd: 1 } };
 // Buying tickets with aether (any number of times): what it costs and what it gives.
 const EXCHANGE = {
   "std-1": { cost: 160, give: { gmmTicketStd: 1 } },
@@ -95,7 +100,12 @@ function inject(src) {
     + `if(__gmmH<${count})return{ok:!1,error:"insufficient-tickets",ticket:__gmmT,need:${count},held:__gmmH};${run}.wallet[__gmmT]=__gmmH-${count};`;
   const swapped = "/*gacha-more-money:swap:" + Buffer.from(payText, "utf8").toString("base64") + "*/" + ticketPay + "/*gacha-more-money:swapend*/";
 
-  const head = HEAD + "const __gmmPacks=" + JSON.stringify(PACKS) + ",__gmmExchange=" + JSON.stringify(EXCHANGE) + ",__gmmDaily=" + DAILY + ";"
+  const head = HEAD + "const __gmmPacks=" + JSON.stringify(PACKS) + ",__gmmExchange=" + JSON.stringify(EXCHANGE) + ",__gmmPassDef=" + JSON.stringify(PASS) + ",__gmmDaily=" + DAILY + ";"
+    + "function __gmmDayNum(){let d=new Date();return Math.floor((d.getTime()-d.getTimezoneOffset()*6e4)/864e5)}"
+    + "function __gmmPass(S){let P=S&&S.moreMoneyPass,n=__gmmDayNum();if(!P||!Number.isFinite(Number(P.start)))return{active:!1,days:__gmmPassDef.days,rewards:__gmmPassDef};"
+    + "let st=Number(P.start),day=n-st+1,claimed=Array.isArray(P.claimed)?P.claimed.map(Number):[],active=day>=1&&day<=__gmmPassDef.days;"
+    + "return{active,day:active?day:0,days:__gmmPassDef.days,daysLeft:active?__gmmPassDef.days-day:0,claimedToday:claimed.includes(n),claimedDays:claimed.map(c=>c-st+1).filter(c=>c>=1&&c<=__gmmPassDef.days),rewards:__gmmPassDef}}"
+    + "function __gmmGive(M,G){for(let[c,q]of Object.entries(G))M[c]=(Number(M[c])||0)+q}"
     + "function __gmmTickets(W){W=W||{};return{std:Math.max(0,Math.floor(Number(W.gmmTicketStd)||0)),ltd:Math.max(0,Math.floor(Number(W.gmmTicketLtd)||0))}}"
     + "function __gmmToday(){let d=new Date();return d.getFullYear()+\"-\"+(d.getMonth()+1)+\"-\"+d.getDate()}"
     + "function __gmmLeft(S){let day=__gmmToday(),m=S&&S.moreMoney,used=m&&m.day===day?Math.max(0,Number(m.count)||0):0;return{day,used,left:Math.max(0,__gmmDaily-used),daily:__gmmDaily}}"
@@ -103,7 +113,7 @@ function inject(src) {
   const check = `let u=p&&p.body||{},o=${str}(u.runId);if(!o)return{ok:!1,error:"bad-request"};let{data:g}=await ${readIndex}();if(!${hasRun}(g,o))return{ok:!1,error:"bad-request"};`;
   const list = (obj) => `Object.entries(${obj}||{}).filter(([,v])=>v&&${str}(v.url)).map(([key,v])=>({key,name:${str}(v.name)||key,url:${str}(v.url)}))`;
   const routes = START
-    + `${router}.post("/more-money/status",async p=>{${check}let{data:S}=await ${readRun}(o);return{ok:!0,packs:__gmmPacks,exchange:__gmmExchange,tickets:__gmmTickets(S&&S.wallet),...__gmmLeft(S)}}),`
+    + `${router}.post("/more-money/status",async p=>{${check}let{data:S}=await ${readRun}(o);return{ok:!0,packs:__gmmPacks,exchange:__gmmExchange,tickets:__gmmTickets(S&&S.wallet),pass:__gmmPass(S),...__gmmLeft(S)}}),`
     + `${router}.post("/more-money/topup",async p=>{${check}let k=${str}(u.pack),P=Object.prototype.hasOwnProperty.call(__gmmPacks,k)?__gmmPacks[k]:null;if(!P)return{ok:!1,error:"bad-request"};`
     + `await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),t=__gmmLeft(S);if(t.left<=0)return{ok:!1,error:"daily-limit",...t};`
     + `for(let[c,q]of Object.entries(P))M[c]=(Number(M[c])||0)+q;S.moreMoney={day:t.day,count:t.used+1};S.wallet=M;`
@@ -112,6 +122,13 @@ function inject(src) {
     + `await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),h=Math.max(0,Number(M.aether)||0);if(h<X.cost)return{ok:!1,error:"insufficient-aether",need:X.cost,held:h};`
     + `M.aether=h-X.cost;for(let[c,q]of Object.entries(X.give))M[c]=(Number(M[c])||0)+q;S.wallet=M;`
     + `return await ${writeRun}(o,b,S)?{ok:!0,item:k,spent:X.cost,granted:X.give,wallet:${pub}(M,S),tickets:__gmmTickets(M)}:{ok:!1,error:"write-conflict"}}),`
+    + `${router}.post("/more-money/pass/buy",async p=>{${check}await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S);`
+    + `if(__gmmPass(S).active)return{ok:!1,error:"pass-active",pass:__gmmPass(S)};__gmmGive(M,__gmmPassDef.buy);S.moreMoneyPass={start:__gmmDayNum(),claimed:[]};S.wallet=M;`
+    + `return await ${writeRun}(o,b,S)?{ok:!0,granted:__gmmPassDef.buy,wallet:${pub}(M,S),tickets:__gmmTickets(M),pass:__gmmPass(S)}:{ok:!1,error:"write-conflict"}}),`
+    + `${router}.post("/more-money/pass/claim",async p=>{${check}await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),P=__gmmPass(S);`
+    + `if(!P.active)return{ok:!1,error:"pass-inactive",pass:P};if(P.claimedToday)return{ok:!1,error:"pass-claimed",pass:P};__gmmGive(M,__gmmPassDef.daily);`
+    + `S.moreMoneyPass={...S.moreMoneyPass,claimed:[...(S.moreMoneyPass.claimed||[]),__gmmDayNum()]};S.wallet=M;`
+    + `return await ${writeRun}(o,b,S)?{ok:!0,granted:__gmmPassDef.daily,wallet:${pub}(M,S),tickets:__gmmTickets(M),pass:__gmmPass(S)}:{ok:!1,error:"write-conflict"}}),`
     + `${router}.post("/more-money/codex",async p=>{${check}let c=await ${store}.getById(${pkg}.id,o+":combat-art"),d=c&&c.data||{};return{ok:!0,enemies:${list("d.enemies")},battle:${list("d.modes")}}}),`
     + END;
   const payAt = summon.index + pay.index;

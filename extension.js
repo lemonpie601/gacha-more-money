@@ -1,4 +1,4 @@
-/* Gacha More Money v1.2.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.3.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 반짝이 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -58,6 +58,8 @@
     { id: "glimmer", name: "반짝이 주머니", icon: "glimmer", grant: "반짝이 300", note: "상점 물건 구매용", price: "₩8,800", tone: "glimmer" },
   ];
   const DAILY = 3;
+  // The weekly pass (keep in sync with patch PASS): not counted in the daily three.
+  const PASS = { price: "₩6,600", days: 7, buy: "월휘 3장", daily: "에테르 300 · 성휘 1장" };
   // Tickets for aether, as often as you like: one summon still costs what it did (160 aether).
   const EXCHANGE = [
     { id: "std-1", ticket: "std", qty: 1, cost: 160 }, { id: "std-10", ticket: "std", qty: 10, cost: 1600 },
@@ -67,12 +69,18 @@
   /* ═════════════ Icons ═════════════
    * Small drawings in a 48×48 box, outlined in the theme's line colour (class "ln") with a white shine ("hi"). */
   const star4 = (x, y, r, w = r * 0.28) => `M${x} ${y - r}Q${x + w} ${y - w} ${x + r} ${y}Q${x + w} ${y + w} ${x} ${y + r}Q${x - w} ${y + w} ${x - r} ${y}Q${x - w} ${y - w} ${x} ${y - r}Z`;
-  const ticket = (body, deep, emblem) => '<g transform="rotate(-10 24 24)">'
-    + '<path class="ln" fill="' + body + '" d="M8 13h32a3 3 0 0 1 3 3v4.6a3.4 3.4 0 0 0 0 6.8V32a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-4.6a3.4 3.4 0 0 0 0-6.8V16a3 3 0 0 1 3-3z"/>'
-    + '<path fill="' + deep + '" d="M8 30.5h32a1.5 1.5 0 0 1 1.5 1.5v.2a1.3 1.3 0 0 1-1.3 1.3H7.8a1.3 1.3 0 0 1-1.3-1.3V32A1.5 1.5 0 0 1 8 30.5z"/>'
-    + '<rect class="hi" x="9" y="15.5" width="20" height="2.6" rx="1.3"/>'
-    + '<path d="M16 17v13" stroke="' + deep + '" stroke-width="1.8" stroke-dasharray="2 2.4" stroke-linecap="round"/>'
-    + emblem + '</g>';
+  // A bright, glossy ticket: a gradient body edged in its own deeper colour (not the dark outline), a white
+  // inner frame and perforation, and a gold emblem. id names its gradients inside the shadow root.
+  const TICKET_PATH = "M8 13h32a3 3 0 0 1 3 3v4.6a3.4 3.4 0 0 0 0 6.8V32a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-4.6a3.4 3.4 0 0 0 0-6.8V16a3 3 0 0 1 3-3z";
+  const ticket = (id, light, mid, edge, emblem) => '<defs><linearGradient id="gmm-' + id + '" x1="0" y1="0" x2="0.35" y2="1">'
+    + '<stop offset="0" stop-color="' + light + '"/><stop offset="1" stop-color="' + mid + '"/></linearGradient>'
+    + '<linearGradient id="gmm-' + id + '-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF8D2"/><stop offset="1" stop-color="#FFC93C"/></linearGradient></defs>'
+    + '<g transform="rotate(-10 24 24)">'
+    + '<path fill="url(#gmm-' + id + ')" stroke="' + edge + '" stroke-width="2.4" stroke-linejoin="round" d="' + TICKET_PATH + '"/>'
+    + '<path fill="#fff" opacity=".28" d="M8.6 14.6h30.8a1.8 1.8 0 0 1 1.8 1.8v3.6c-9 2.4-23 2.4-34.4 0v-3.6a1.8 1.8 0 0 1 1.8-1.8z"/>'
+    + '<rect x="9" y="16.4" width="30" height="15.2" rx="2.2" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="1.2"/>'
+    + '<path d="M16 18.5v11" stroke="#fff" stroke-opacity=".9" stroke-width="1.6" stroke-dasharray="1.6 2.2" stroke-linecap="round"/>'
+    + emblem.replaceAll("GOLD", "url(#gmm-" + id + "-gold)").replaceAll("EDGE", edge) + '</g>';
   const crystal = (cx, cy, s, fill, face) => {
     const p = (x, y) => (cx + x * s).toFixed(1) + " " + (cy + y * s).toFixed(1);
     return '<path class="ln" fill="' + fill + '" d="M' + p(-6, -12) + "L" + p(6, -12) + "L" + p(12, -4) + "L" + p(0, 13) + "L" + p(-12, -4) + 'Z"/>'
@@ -85,8 +93,10 @@
     + '<ellipse fill="none" stroke="#E9A400" stroke-width="1.5" cx="' + x + '" cy="' + y + '" rx="8.5" ry="3"/>';
   const twinkle = (x, y, r) => '<path fill="#FFF6C8" class="ln" stroke-width="1.2" d="' + star4(x, y, r) + '"/>';
   const ICONS = {
-    std: ticket("#4FC3F7", "#1E8FD0", '<path class="ln" stroke-width="1.8" fill="#FFF6C8" d="' + star4(29.5, 22.5, 7) + '"/>' + twinkle(37, 16.5, 2.4)),
-    ltd: ticket("#E0476E", "#A82648", '<path class="ln" stroke-width="1.8" fill="#FFE8A3" d="M32.5 15.6a7.2 7.2 0 1 0 0 13.8a5.8 5.8 0 1 1 0-13.8z"/>' + twinkle(37.5, 18, 2.4)),
+    std: ticket("std", "#B8EEFF", "#3DB2F5", "#1C8AD6", '<path fill="GOLD" stroke="EDGE" stroke-width="1.6" stroke-linejoin="round" d="' + star4(28.5, 24, 6.8) + '"/>'
+      + '<path fill="#fff" d="' + star4(36.5, 19, 2.2) + '"/><circle fill="#fff" cx="35" cy="29" r="1"/>'),
+    ltd: ticket("ltd", "#FFD0DE", "#FF5C8A", "#D6336A", '<path fill="GOLD" stroke="EDGE" stroke-width="1.6" stroke-linejoin="round" d="M31.4 17.2a7 7 0 1 0 0 13.6a5.6 5.6 0 1 1 0-13.6z"/>'
+      + '<path fill="#fff" d="' + star4(36.5, 19, 2.2) + '"/><circle fill="#fff" cx="36" cy="28.5" r="1"/>'),
     aether1: crystal(24, 25, 1.35, "#A98CF5", "#CDB8FF") + twinkle(40, 9, 3.2),
     aether2: crystal(14, 31, 0.8, "#8C6CF0", "#B9A2FA") + crystal(29, 24, 1.15, "#A98CF5", "#CDB8FF") + twinkle(42, 9, 3.2),
     aether3: crystal(11, 33, 0.72, "#8C6CF0", "#B9A2FA") + crystal(37, 33, 0.72, "#8C6CF0", "#B9A2FA") + crystal(24, 23, 1.15, "#A98CF5", "#CDB8FF") + twinkle(41, 8, 3.2),
@@ -98,6 +108,12 @@
       + '<path class="ln" stroke-width="1.8" fill="#FFF3A0" d="M26.5 20l-7 10h4.5l-2 8.5 8-11h-4.6z"/><rect class="hi" x="16.5" y="21" width="2.4" height="13" rx="1.2"/>',
     glimmer: '<path class="ln" fill="#FFB347" d="' + star4(21, 27, 15, 3.4) + '"/><path class="hi" d="' + star4(17.5, 22.5, 3, 0.8) + '"/>'
       + '<path class="ln" stroke-width="1.8" fill="#FFD34E" d="' + star4(36.5, 13, 7, 1.8) + '"/><circle class="ln" stroke-width="1.4" fill="#FFD34E" cx="38" cy="35" r="2.6"/>',
+    pass: '<defs><linearGradient id="gmm-pass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE9A8"/><stop offset="1" stop-color="#FFB347"/></linearGradient></defs>'
+      + '<rect x="7" y="10" width="34" height="31" rx="5" fill="url(#gmm-pass)" stroke="#E08A1E" stroke-width="2.4"/>'
+      + '<path d="M7 18.5h34" stroke="#E08A1E" stroke-width="2"/><path fill="#fff" opacity=".35" d="M10 12.5h28a1.5 1.5 0 0 1 1.5 1.5v3H8.5v-3a1.5 1.5 0 0 1 1.5-1.5z"/>'
+      + '<rect x="14" y="6" width="3.6" height="8" rx="1.8" fill="#fff" stroke="#E08A1E" stroke-width="1.8"/><rect x="30.4" y="6" width="3.6" height="8" rx="1.8" fill="#fff" stroke="#E08A1E" stroke-width="1.8"/>'
+      + '<text x="24" y="36.5" text-anchor="middle" font-family="Jua, sans-serif" font-size="15" font-weight="700" fill="#fff" stroke="#E08A1E" stroke-width="3" paint-order="stroke">7</text>'
+      + '<path fill="#fff" d="' + star4(38, 9, 3.4) + '"/>',
     gift: '<path class="ln" fill="#FF8FB1" d="M9 22h30v16a3 3 0 0 1-3 3H12a3 3 0 0 1-3-3z"/><rect class="ln" fill="#FFB3C9" x="6" y="15" width="36" height="8" rx="2"/>'
       + '<path class="ln" fill="#FFE17A" d="M21 15h6v26h-6z"/><path class="ln" fill="#FFE17A" d="M24 15c-3-6-10-7-10-2.5S20 15 24 15zM24 15c3-6 10-7 10-2.5S28 15 24 15z"/>'
       + '<rect class="hi" x="9" y="17" width="9" height="2.2" rx="1.1"/>',
@@ -126,6 +142,26 @@
 .gmm-pack[data-best]::before { content: attr(data-best); position: absolute; top: -.75em; right: .8em; padding: .05em .7em; border-radius: 999px; background: #FF6F91; color: #fff;
   border: 2px solid var(--gfx-line, #6B4528); font-size: calc(var(--f, 10px) * .85); rotate: 6deg; }
 .gmm-pack .gmm-ic { display: block; width: calc(var(--f, 10px) * 5.2); height: calc(var(--f, 10px) * 5.2); }
+.gmm-pass { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .9em; padding: .8em 1em; border-radius: 20px;
+  background: linear-gradient(110deg, color-mix(in srgb, #FFE9A8 55%, var(--gfx-card, #FFFDF5)), var(--gfx-card, #FFFDF5) 60%);
+  border: 3px solid var(--gfx-line, #6B4528); box-shadow: 0 .3em 0 var(--gfx-line, #6B4528); }
+.gmm-pass > .gmm-ic { width: calc(var(--f, 10px) * 5.4); height: calc(var(--f, 10px) * 5.4); }
+.gmm-pass-body { display: flex; flex-direction: column; gap: .25em; min-width: 0; }
+.gmm-pass-title { font-size: calc(var(--f, 10px) * 1.35); display: flex; align-items: baseline; gap: .6em; flex-wrap: wrap; }
+.gmm-pass-title small { font-size: .7em; color: var(--gfx-accent, #F0763A); }
+.gmm-pass-line { font-size: calc(var(--f, 10px) * .9); opacity: .85; white-space: pre-wrap; }
+.gmm-pass-days { display: flex; gap: .35em; margin-top: .2em; flex-wrap: wrap; }
+.gmm-pass-days span { display: grid; place-items: center; width: 1.9em; height: 1.9em; border-radius: 50%; font-size: calc(var(--f, 10px) * .8);
+  background: var(--gfx-card, #FFFDF5); border: 2px solid color-mix(in srgb, var(--gfx-line, #6B4528) 40%, transparent); }
+.gmm-pass-days span[data-got] { background: #FFC93C; border-color: var(--gfx-line, #6B4528); color: #5A3A10; }
+.gmm-pass-days span[data-today] { border: 2.5px solid var(--gfx-accent, #F0763A); animation: gmm-ask .6s ease-in-out infinite alternate; }
+.gmm-pass-days span[data-miss] { opacity: .45; text-decoration: line-through; }
+.gmm-pass > button { cursor: pointer; font: inherit; font-size: calc(var(--f, 10px) * 1.1); white-space: nowrap; padding: .4em 1.1em; border-radius: 999px;
+  color: #5A3A10; background: linear-gradient(180deg, #FFE27A, #FFC93C); border: 2.5px solid var(--gfx-line, #6B4528); box-shadow: 0 .2em 0 var(--gfx-line, #6B4528); }
+.gmm-pass > button[data-claim]:not(:disabled) { background: linear-gradient(180deg, #8EE6A0, #3DA95A); color: #fff; }
+.gmm-pass > button[data-ask] { background: linear-gradient(180deg, #FF9BB5, #FF6F91); color: #fff; animation: gmm-ask .5s ease-in-out infinite alternate; }
+.gmm-pass > button:disabled { filter: grayscale(.6); opacity: .7; cursor: default; }
+@container (max-width: 520px) { .gmm-pass { grid-template-columns: auto 1fr; } .gmm-pass > button { grid-column: 1 / -1; } }
 .gmm-pane h3 { margin: .4em 0 0; font-weight: 400; font-size: calc(var(--f, 10px) * 1.25); display: flex; align-items: baseline; gap: .5em; flex-wrap: wrap; }
 .gmm-pane h3 small { font-size: .7em; opacity: .7; }
 .gmm-pane .gmm-xgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--f, 10px) * 20), 1fr)); gap: .8em; }
@@ -135,7 +171,7 @@
 .gmm-tile .art .gmm-ic { display: block; width: 100%; aspect-ratio: 1; }
 .gmm-tix .gmm-ic { display: block; width: 2.2em; height: 2.2em; margin: -.35em 0; }
 /* Drawn icons: outlined like the rest of 말랑 UI, a sticker shadow under them. */
-.gmm-svg { overflow: visible; filter: drop-shadow(0 .1em 0 color-mix(in srgb, var(--gfx-line, #6B4528) 45%, transparent)); }
+.gmm-svg { overflow: visible; filter: drop-shadow(0 .08em .04em rgba(0, 0, 0, .18)); }
 .gmm-svg .ln { stroke: var(--gfx-line, #6B4528); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
 .gmm-svg .hi { fill: #fff; opacity: .55; }
 .gmm-x .gmm-nm { display: flex; flex-direction: column; line-height: 1.25; white-space: nowrap; min-width: 0; font-size: calc(var(--f, 10px) * 1.1); }
@@ -219,6 +255,58 @@
     buying = "";
     schedule();
   }
+  async function passAction(kind) {
+    if (buying) return;
+    if (kind === "buy" && confirming !== "pass") { confirming = "pass"; schedule(); return; }
+    confirming = ""; buying = "pass-" + kind; lastNote = ""; schedule();
+    if (kind === "buy") await new Promise((r) => setTimeout(r, 700));
+    try {
+      const data = await gf("/more-money/pass/" + kind, { runId: runId() });
+      status = { ...(status || {}), tickets: data.tickets, pass: data.pass };
+      lastNote = kind === "buy" ? "주간 패스 시작! " + PASS.buy + "을(를) 받았어요. 오늘부터 " + PASS.days + "일 동안 매일 보상을 받으세요."
+        : "주간 패스 " + data.pass.day + "일째 보상: " + PASS.daily + "을(를) 받았어요!";
+      adoptWallet(data.wallet);
+    } catch (e) {
+      if (unpatched(e)) patchMissing = true;
+      else lastNote = ({ "pass-active": "이미 주간 패스가 진행 중이에요.", "pass-claimed": "오늘 보상은 이미 받았어요. 내일 또 와 주세요!", "pass-inactive": "주간 패스가 없어요." })[e.message]
+        || "주간 패스를 처리하지 못했어요 (" + e.message + ").";
+      loadStatus(true);
+    }
+    buying = "";
+    schedule();
+  }
+  function passCard() {
+    const ps = status && status.pass, on = !!(ps && ps.active);
+    const card = el("div", "gmm-pass" + (on ? " on" : ""));
+    const body = el("div", "gmm-pass-body");
+    const title = el("div", "gmm-pass-title", "주간 패스");
+    if (on) title.append(el("small", "", ps.day + "일째 · 남은 " + ps.daysLeft + "일"));
+    body.append(title, el("div", "gmm-pass-line", "구매 즉시  " + PASS.buy), el("div", "gmm-pass-line", PASS.days + "일 동안 매일  " + PASS.daily));
+    const dots = el("div", "gmm-pass-days");
+    for (let d = 1; d <= PASS.days; d++) {
+      const dot = el("span", "", String(d));
+      if (on && (ps.claimedDays || []).includes(d)) dot.dataset.got = "";
+      else if (on && d === ps.day) dot.dataset.today = "";
+      else if (on && d < ps.day) dot.dataset.miss = "";
+      dots.append(dot);
+    }
+    body.append(dots);
+    let b;
+    if (!on) {
+      b = el("button", "", buying === "pass-buy" ? "결제 중…" : confirming === "pass" ? PASS.price + " 결제할까요?" : PASS.price);
+      if (confirming === "pass") b.dataset.ask = "";
+      b.addEventListener("click", (e) => { e.stopPropagation(); passAction("buy"); });
+    } else {
+      b = el("button", "", ps.claimedToday ? "오늘 보상 받음 ✓" : buying === "pass-claim" ? "받는 중…" : "오늘 보상 받기");
+      b.dataset.claim = "";
+      b.disabled = !!ps.claimedToday;
+      b.addEventListener("click", (e) => { e.stopPropagation(); passAction("claim"); });
+    }
+    b.type = "button";
+    if (buying || patchMissing) b.disabled = true;
+    card.append(icon("pass"), body, b);
+    return card;
+  }
   // Aether for tickets: no "pay?" step, it is the game's own currency (like the shop's glimmer items).
   async function exchange(x) {
     if (buying) return;
@@ -277,7 +365,7 @@
     pane.classList.toggle("gmm-open", shopOpen);
     let mine = pane.querySelector(":scope > .gmm-pane");
     if (!shopOpen) { mine?.remove(); paintKeyItems(rail, pane); return; }
-    const key = JSON.stringify([left, buying, confirming, patchMissing, lastNote, status && status.tickets, aether()]);
+    const key = JSON.stringify([left, buying, confirming, patchMissing, lastNote, status && status.tickets, status && status.pass, aether()]);
     if (mine && mine.dataset.key === key) return;
     const scroll = mine ? mine.scrollTop : 0;
     mine?.remove();
@@ -288,6 +376,8 @@
     mine.append(top);
     if (patchMissing) mine.append(el("div", "gmm-msg", "충전하려면 서버 패치가 필요해요.\n마리나라를 끄고, 이 확장 폴더의 patch/apply-patch.mjs를 실행한 뒤 다시 켜 주세요.\n(자세한 방법은 README 참고)"));
     if (lastNote) mine.append(el("div", "gmm-msg", lastNote));
+    const h0 = el("h3", "", "주간 패스"); h0.append(el("small", "", "하루 " + DAILY + "번 충전과 따로 세요 · 끝나면 다시 살 수 있어요"));
+    mine.append(h0, passCard());
     const h1 = el("h3", "", "소환권 교환"); h1.append(el("small", "", "에테르로 사요 · 상시 배너는 성휘, 한정 배너는 월휘으로만 소환할 수 있어요"));
     const xgrid = el("div", "gmm-xgrid"); xgrid.append(exchangeRow("std"), exchangeRow("ltd"));
     const h2 = el("h3", "", "오늘의 충전"); h2.append(el("small", "", "모든 상품을 합쳐 하루 " + DAILY + "번"));
