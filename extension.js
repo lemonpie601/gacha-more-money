@@ -1,4 +1,4 @@
-/* Gacha More Money v1.5.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.5.1 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 반짝이 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -47,8 +47,8 @@
   };
   const PACKS = [
     { id: "starter", name: "첫걸음 꾸러미", icon: "gift", grant: "에테르 1,600 · 자금 50,000 · 월휘 1장", note: "가장 알찬 구성", price: "₩4,400", tone: "gift", best: "추천" },
-    { id: "ticket-ltd", name: "월휘 꾸러미", icon: "ltd", grant: "월휘 10장", note: "한정 배너 10회 소환", price: "₩49,000", tone: "ltd", best: "인기!" },
-    { id: "ticket-std", name: "성휘 꾸러미", icon: "std", grant: "성휘 10장", note: "상시 배너 10회 소환", price: "₩29,000", tone: "std" },
+    { id: "ticket-ltd", name: "월휘 꾸러미", icon: "ltd", grant: "월휘 10장", note: "한정 배너 10회 소환", price: "₩33,000", tone: "ltd", best: "인기!" },
+    { id: "ticket-std", name: "성휘 꾸러미", icon: "std", grant: "성휘 10장", note: "상시 배너 10회 소환", price: "₩33,000", tone: "std" },
     { id: "aether-s", name: "에테르 한 줌", icon: "aether1", grant: "에테르 1,600", note: "소환권 10장어치", price: "₩33,000", tone: "aether" },
     { id: "aether-m", name: "에테르 상자", icon: "aether2", grant: "에테르 4,800", note: "소환권 30장어치", price: "₩99,000", tone: "aether" },
     { id: "aether-l", name: "에테르 보물고", icon: "aether3", grant: "에테르 9,600", note: "소환권 60장어치", price: "₩199,000", tone: "aether" },
