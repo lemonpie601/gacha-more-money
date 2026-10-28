@@ -1,4 +1,4 @@
-/* Gacha More Money v1.7.1 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.8.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 글리머 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -46,7 +46,7 @@
     ltd: { key: "gmmTicketLtd", name: "월휘", kind: "한정 소환권", tone: "ltd" },
   };
   const PACKS = [
-    { id: "starter", name: "첫걸음 꾸러미", icon: "gift", grant: "에테르 1,600 · 자금 5만 · 월휘 1장", note: "가장 알찬 구성", price: "₩4,400", tone: "gift", best: "추천" },
+    { id: "starter", name: "첫걸음 꾸러미", icon: "gift", grant: "에테르 1,600 · 자금 5만 · 월휘 1장", note: "가장 알찬 구성", price: "₩4,400", tone: "gift", best: "1회 한정", once: true },
     { id: "ticket-ltd", name: "월휘 꾸러미", icon: "ltd", grant: "월휘 10장", note: "한정 배너 10회 소환", price: "₩33,000", tone: "ltd", best: "인기!" },
     { id: "ticket-std", name: "성휘 꾸러미", icon: "std", grant: "성휘 10장", note: "상시 배너 10회 소환", price: "₩33,000", tone: "std" },
     { id: "aether-s", name: "에테르 한 줌", icon: "aether1", grant: "에테르 1,600", note: "소환권 10장어치", price: "₩33,000", tone: "aether" },
@@ -58,6 +58,8 @@
     { id: "glimmer", name: "글리머 주머니", icon: "glimmer", grant: "글리머 300", note: "상점 물건 구매용", price: "₩8,800", tone: "glimmer" },
   ];
   const DAILY = 3;
+  // Packs marked once: one purchase per world, ever (the server keeps the list; keep in sync with patch ONCE).
+  const bought = (p) => !!(p.once && status && Array.isArray(status.bought) && status.bought.includes(p.id));
   // The weekly pass (keep in sync with patch PASS): not counted in the daily three.
   const PASS = { price: "₩6,600", days: 7, buy: "월휘 3장", daily: "에테르 300 · 성휘 1장" };
   // Tickets for aether, as often as you like: one summon still costs what it did (160 aether).
@@ -236,6 +238,8 @@
 .gmm-pack[data-best]::before { content: attr(data-best); position: absolute; top: .45em; right: .55em; padding: .05em .7em; border-radius: var(--gmm-pill);
   background: var(--gmm-accent); color: var(--gmm-on-accent); font-size: calc(var(--f, 10px) * .8); }
 :host([data-gfx-style="trickcal"]) .gmm-pack[data-best]::before { top: -.75em; right: .8em; background: #FF6F91; color: #fff; border: 2px solid var(--gmm-line); font-size: calc(var(--f, 10px) * .85); rotate: 6deg; }
+.gmm-pack[data-done] { opacity: .6; }
+.gmm-pack[data-done] button { filter: grayscale(.8); cursor: default; }
 .gmm-pack .gmm-ic { display: block; width: calc(var(--f, 10px) * 5.2); height: calc(var(--f, 10px) * 5.2); }
 .gmm-pass { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .9em; padding: .8em 1em; border-radius: var(--gmm-r);
   background: linear-gradient(110deg, color-mix(in srgb, var(--gmm-pick) 22%, var(--gmm-card)), var(--gmm-card) 60%);
@@ -428,6 +432,7 @@
       adoptWallet(data.wallet);
     } catch (e) {
       if (unpatched(e)) patchMissing = true;
+      else if (e.message === "already-bought") { lastNote = pack.name + "은(는) 한 번만 살 수 있어요."; status = { ...(status || {}), bought: [...((status && status.bought) || []), pack.id] }; }
       else if (e.message === "daily-limit") { lastNote = "오늘은 더 충전할 수 없어요. 내일 다시 와 주세요!"; status = { ...(status || {}), left: 0 }; }
       else lastNote = "충전하지 못했어요 (" + e.message + "). 잠시 뒤 다시 시도해 주세요.";
     }
@@ -628,7 +633,7 @@
     pane.classList.toggle("gmm-open", shopOpen);
     let mine = pane.querySelector(":scope > .gmm-pane");
     if (!shopOpen) { mine?.remove(); paintKeyItems(rail, pane); return; }
-    const key = JSON.stringify([left, buying, confirming, patchMissing, lastNote, status && status.tickets, status && status.pass, aether(), status && status.history && status.history.length, status && status.history && status.history[0] && status.history[0].at]);
+    const key = JSON.stringify([left, buying, confirming, patchMissing, lastNote, status && status.tickets, status && status.pass, status && status.bought, aether(), status && status.history && status.history.length, status && status.history && status.history[0] && status.history[0].at]);
     if (mine && mine.dataset.key === key) return;
     const scroll = mine ? mine.scrollTop : 0;
     mine?.remove();
@@ -645,10 +650,11 @@
     const h2 = el("h3", "", "오늘의 충전"); h2.append(el("small", "", "모든 상품을 합쳐 하루 " + DAILY + "번"));
     const grid = el("div", "gmm-grid");
     for (const p of PACKS) {
-      const card = el("div", "gmm-pack"); card.dataset.tone = p.tone; if (p.best) card.dataset.best = p.best;
-      const b = el("button", "", buying === p.id ? "결제 중…" : confirming === p.id ? p.price + " 결제할까요?" : p.price); b.type = "button";
+      const done = bought(p);
+      const card = el("div", "gmm-pack"); card.dataset.tone = p.tone; if (p.best) card.dataset.best = p.best; if (done) card.dataset.done = "";
+      const b = el("button", "", done ? "구매 완료" : buying === p.id ? "결제 중…" : confirming === p.id ? p.price + " 결제할까요?" : p.price); b.type = "button";
       if (confirming === p.id) b.dataset.ask = "";
-      b.disabled = !!buying || patchMissing || left === 0;
+      b.disabled = done || !!buying || patchMissing || left === 0;
       b.addEventListener("click", (e) => { e.stopPropagation(); buy(p); });
       const row = el("div", "gmm-buyrow"); row.append(b);
       if (confirming === p.id && !buying) row.append(cancelButton());

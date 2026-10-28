@@ -3,7 +3,7 @@
  *
  * 가챠 포지(gacha-forge) 패키지의 server.mjs에 세 가지 요청을 덧붙입니다.
  *   POST /api/gacha-forge/more-money/status  오늘 남은 충전 횟수
- *   POST /api/gacha-forge/more-money/topup     충전(하루 3번): 에테르 · 자금 · 활력 · 글리머 · 소환권을 지갑에 넣음
+ *   POST /api/gacha-forge/more-money/topup     충전(하루 3번): 에테르 · 자금 · 활력 · 글리머 · 소환권을 지갑에 넣음 (첫걸음 꾸러미는 세계마다 한 번만)
  *   POST /api/gacha-forge/more-money/exchange  에테르로 소환권 사기
  *   POST /api/gacha-forge/more-money/codex     도감용 적 이미지 · 전투 배경 · 세계의 모든 캐릭터 · 의상(미획득 포함) · 메신저 사진 목록
  *   POST /api/gacha-forge/more-money/pass/buy    주간 패스 구매(7일): 바로 받는 보상
@@ -47,6 +47,8 @@ const PACKS = {
   "starter": { aether: 1600, funds: 50000, gmmTicketLtd: 1 },
 };
 const DAILY = 3;
+// Packs that can be bought only once per world (run), ever.
+const ONCE = ["starter"];
 // The weekly pass: bought once (again only after it ends), a gift at once, then a reward every day for 7 days
 // (the day it is bought counts as day 1). Days follow the Marinara server computer's local date.
 const PASS = { days: 7, buy: { gmmTicketLtd: 3 }, daily: { aether: 300, gmmTicketStd: 1 } };
@@ -106,7 +108,7 @@ function inject(src) {
     + `if(__gmmH<${count})return{ok:!1,error:"insufficient-tickets",ticket:__gmmT,need:${count},held:__gmmH};${run}.wallet[__gmmT]=__gmmH-${count};`;
   const swapped = "/*gacha-more-money:swap:" + Buffer.from(payText, "utf8").toString("base64") + "*/" + ticketPay + "/*gacha-more-money:swapend*/";
 
-  const head = HEAD + "const __gmmPacks=" + JSON.stringify(PACKS) + ",__gmmExchange=" + JSON.stringify(EXCHANGE) + ",__gmmPassDef=" + JSON.stringify(PASS) + ",__gmmDaily=" + DAILY + ";"
+  const head = HEAD + "const __gmmPacks=" + JSON.stringify(PACKS) + ",__gmmExchange=" + JSON.stringify(EXCHANGE) + ",__gmmPassDef=" + JSON.stringify(PASS) + ",__gmmDaily=" + DAILY + ",__gmmOnce=" + JSON.stringify(ONCE) + ";"
     + "function __gmmDayNum(){let d=new Date();return Math.floor((d.getTime()-d.getTimezoneOffset()*6e4)/864e5)}"
     + "function __gmmPass(S){let P=S&&S.moreMoneyPass,n=__gmmDayNum();if(!P||!Number.isFinite(Number(P.start)))return{active:!1,days:__gmmPassDef.days,rewards:__gmmPassDef};"
     + "let st=Number(P.start),day=n-st+1,claimed=Array.isArray(P.claimed)?P.claimed.map(Number):[],active=day>=1&&day<=__gmmPassDef.days;"
@@ -120,6 +122,8 @@ function inject(src) {
     + "function __gmmRid(u){let r=u&&typeof u.requestId==\"string\"?u.requestId:\"\";return/^[A-Za-z0-9_-]{16,128}$/.test(r)?r:\"\"}"
     + "function __gmmSeen(S,r){let L=S&&S.moreMoneyReceipts;return r&&Array.isArray(L)?L.find(x=>x&&x.requestId===r)||null:null}"
     + "function __gmmLog(S,e){let L=Array.isArray(S.moreMoneyReceipts)?S.moreMoneyReceipts:[];S.moreMoneyReceipts=[e,...L].slice(0,20);return e}"
+    // One-time packs already bought; a purchase from before this list existed still shows in the receipts.
+    + "function __gmmBought(S){let B=Array.isArray(S&&S.moreMoneyOnce)?S.moreMoneyOnce.filter(x=>typeof x==\"string\"):[];for(let r of __gmmHist(S))if(r&&r.kind===\"topup\"&&__gmmOnce.includes(r.item)&&!B.includes(r.item))B.push(r.item);return B}"
     + "function __gmmHist(S){return Array.isArray(S&&S.moreMoneyReceipts)?S.moreMoneyReceipts.slice(0,20):[]}"
     + HEAD;
   const check = `let u=p&&p.body||{},o=${str}(u.runId);if(!o)return{ok:!1,error:"bad-request"};let{data:g}=await ${readIndex}();if(!${hasRun}(g,o))return{ok:!1,error:"bad-request"};`;
@@ -128,11 +132,11 @@ function inject(src) {
   const replay = `let rid=__gmmRid(u),seen=__gmmSeen(S,rid);if(seen)return{ok:!0,replay:!0,receipt:seen,wallet:${pub}(M,S),tickets:__gmmTickets(M),pass:__gmmPass(S),history:__gmmHist(S),...__gmmLeft(S)};`;
   const receipt = (kind, item, granted, spent) => `__gmmLog(S,{requestId:rid,kind:"${kind}",item:${item},granted:${granted},spent:${spent},at:Date.now(),aetherBefore:a0,aetherAfter:Number(M.aether)||0})`;
   const routes = START
-    + `${router}.post("/more-money/status",async p=>{${check}let{data:S}=await ${readRun}(o);return{ok:!0,packs:__gmmPacks,exchange:__gmmExchange,tickets:__gmmTickets(S&&S.wallet),pass:__gmmPass(S),history:__gmmHist(S),...__gmmLeft(S)}}),`
+    + `${router}.post("/more-money/status",async p=>{${check}let{data:S}=await ${readRun}(o);return{ok:!0,packs:__gmmPacks,exchange:__gmmExchange,tickets:__gmmTickets(S&&S.wallet),pass:__gmmPass(S),history:__gmmHist(S),once:__gmmOnce,bought:__gmmBought(S),...__gmmLeft(S)}}),`
     + `${router}.post("/more-money/topup",async p=>{${check}let k=${str}(u.pack),P=Object.prototype.hasOwnProperty.call(__gmmPacks,k)?__gmmPacks[k]:null;if(!P)return{ok:!1,error:"bad-request"};`
-    + `await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),t=__gmmLeft(S),a0=Number(M.aether)||0;${replay}if(t.left<=0)return{ok:!1,error:"daily-limit",...t};`
-    + `for(let[c,q]of Object.entries(P))M[c]=(Number(M[c])||0)+q;S.moreMoney={day:t.day,count:t.used+1};S.wallet=M;let rc=${receipt("topup", "k", "P", "0")};`
-    + `return await ${writeRun}(o,b,S)?{ok:!0,pack:k,granted:P,receipt:rc,wallet:${pub}(M,S),tickets:__gmmTickets(M),history:__gmmHist(S),...__gmmLeft(S)}:{ok:!1,error:"write-conflict"}}),`
+    + `await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),t=__gmmLeft(S),a0=Number(M.aether)||0;${replay}let B=__gmmBought(S);if(__gmmOnce.includes(k)&&B.includes(k))return{ok:!1,error:"already-bought",bought:B,...t};if(t.left<=0)return{ok:!1,error:"daily-limit",...t};`
+    + `for(let[c,q]of Object.entries(P))M[c]=(Number(M[c])||0)+q;S.moreMoney={day:t.day,count:t.used+1};if(__gmmOnce.includes(k))S.moreMoneyOnce=B=[...B,k];S.wallet=M;let rc=${receipt("topup", "k", "P", "0")};`
+    + `return await ${writeRun}(o,b,S)?{ok:!0,pack:k,granted:P,receipt:rc,wallet:${pub}(M,S),tickets:__gmmTickets(M),history:__gmmHist(S),bought:B,...__gmmLeft(S)}:{ok:!1,error:"write-conflict"}}),`
     + `${router}.post("/more-money/exchange",async p=>{${check}let k=${str}(u.item),X=Object.prototype.hasOwnProperty.call(__gmmExchange,k)?__gmmExchange[k]:null;if(!X)return{ok:!1,error:"bad-request"};`
     + `await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),h=Math.max(0,Number(M.aether)||0),a0=h;${replay}if(h<X.cost)return{ok:!1,error:"insufficient-aether",need:X.cost,held:h};`
     + `M.aether=h-X.cost;for(let[c,q]of Object.entries(X.give))M[c]=(Number(M[c])||0)+q;S.wallet=M;let rc=${receipt("exchange", "k", "X.give", "X.cost")};`
