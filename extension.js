@@ -1,4 +1,4 @@
-/* Gacha More Money v1.7.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.7.1 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 글리머 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -840,18 +840,20 @@
     b.append("도감");
     b.addEventListener("click", (e) => { e.stopPropagation(); openCodex(); });
     b.addEventListener("pointerdown", (e) => e.stopPropagation());
+    b.addEventListener("pointerenter", prefetchCodex, { passive: true });
+    b.addEventListener("focus", prefetchCodex);
     parent.append(b);
   }
 
   /* ═════════════ Codex (a page over the game) ═════════════ */
   const PAGE_CSS = `
-.gmm-codex { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; background: rgba(8, 10, 16, .55); backdrop-filter: blur(3px);
+.gmm-codex { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; background: rgba(8, 10, 16, .72);
   font-family: var(--gmm-font, "Malgun Gothic", sans-serif);
   --c-card: var(--gmm-card-hi, #0E1420); --c-text: var(--gmm-text, #EDF1F6); --c-line: var(--gmm-line, #1E293B); --c-edge: var(--gmm-edge, #23374F);
   --c-accent: var(--gmm-accent, #F2603C); --c-on-accent: var(--gmm-on-accent, #fff); --c-pick: var(--gmm-pick, #F0B429);
   --c-sky1: var(--gmm-sky1, #2B3D57); --c-sky2: var(--gmm-sky2, #0B1119); --c-sheet: var(--gmm-sheet, #17212F);
   --c-bw: var(--gmm-bw, 1px); --c-drop: var(--gmm-drop, 0em); --c-r: var(--gmm-r, 0px); --c-pill: var(--gmm-pill, 0px); }
-.gmm-codex[data-skin="mallang"] { background: rgba(40, 28, 20, .45); }
+.gmm-codex[data-skin="mallang"] { background: rgba(40, 28, 20, .62); }
 .gmm-codex * { box-sizing: border-box; }
 .gmm-codex .cx-sheet { position: relative; width: min(1100px, 94vw); height: min(780px, 90vh); display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: .7em;
   padding: 1em 1.1em 1.1em; border-radius: calc(var(--c-r) + 6px); color: var(--c-text); border: var(--c-bw) solid var(--c-line); border-top: 2px solid var(--c-accent);
@@ -879,15 +881,18 @@
   border-radius: var(--c-r); border: var(--c-bw) solid var(--c-line); border-top: 2px solid var(--c-edge); box-shadow: 0 calc(var(--c-drop) * .67) 0 var(--c-line);
   background: linear-gradient(170deg, var(--c-sky1), var(--c-sky2)); transition: translate 120ms ease, border-color 120ms ease; }
 .gmm-codex[data-skin="mallang"] .cx-item { border: 2.5px solid var(--c-line); border-radius: 16px; }
-.gmm-codex .cx-item:hover { translate: 0 -.15em; border-color: var(--c-accent); }
+.gmm-codex .cx-item:hover { transform: translateY(-.15em); border-color: var(--c-accent); }
 .gmm-codex .cx-item img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: contain; object-position: 50% 100%; }
 .gmm-codex .cx-grid.wide .cx-item img { aspect-ratio: 16 / 9; object-fit: cover; object-position: center; }
 .gmm-codex .cx-item span { padding: .25em .4em .3em; background: var(--c-card); border-top: 1px solid var(--c-line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gmm-codex[data-skin="mallang"] .cx-item span { border-top: 2px solid var(--c-line); }
-.gmm-codex .cx-item { position: relative; contain: layout paint; }
+.gmm-codex .cx-item { position: relative; contain: layout paint style; content-visibility: auto; contain-intrinsic-size: auto 220px; }
+.gmm-codex .cx-grid.wide .cx-item { contain-intrinsic-size: auto 160px; }
+.gmm-codex .cx-item img { background: color-mix(in srgb, var(--c-line) 35%, transparent); }
+.gmm-codex .cx-grid[hidden] { display: none; }
 .gmm-codex .cx-item[data-miss]::before { content: "미획득"; position: absolute; top: .45em; left: .45em; z-index: 1; padding: .05em .6em; font-size: .75em;
   border-radius: var(--c-pill); color: #fff; background: rgba(8, 10, 16, .7); }
-.gmm-codex .cx-item[data-miss] img { filter: saturate(.5) brightness(.8); transition: filter 140ms ease; }
+.gmm-codex .cx-item[data-miss] img { filter: saturate(.5) brightness(.8); }
 .gmm-codex .cx-item[data-miss]:hover img { filter: none; }
 .gmm-codex .cx-item[data-r="5"] { border-color: #E0A100; } .gmm-codex .cx-item[data-r="4"] { border-color: #8E6BD6; }
 .gmm-codex .cx-empty { padding: 2em 1em; text-align: center; opacity: .75; line-height: 1.6; white-space: pre-line; }
@@ -939,8 +944,83 @@
     else if (!unpatched(extra.reason)) out.error ||= "적 이미지를 불러오지 못했어요 (" + extra.reason.message + ").";
     return out;
   }
-  let codexCache = null;
-  function closeCodex() { codex?.node.remove(); codex = null; }
+  let codexCache = null, codexLoading = null;
+
+  /* Small pictures for the grid. The originals are full-size portraits (832×1216 and up); drawing dozens of them into
+   * 140px cards is what made the codex stutter. Each card gets a copy about as wide as it is drawn, made once off the
+   * main thread (createImageBitmap) a few at a time as it scrolls near, kept for the session and, where the browser
+   * allows it, in Cache Storage so the next opening is instant. The viewer still shows the original. */
+  const THUMB_VER = "gmm-codex-thumbs-v1";
+  const thumbMem = new Map(); // key -> object URL
+  const thumbWait = [];
+  let thumbBusy = 0, thumbStore;
+  const thumbOk = typeof createImageBitmap === "function" && (typeof OffscreenCanvas === "function" || typeof document.createElement("canvas").toBlob === "function");
+  const thumbKey = (url, w) => new URL(url, location.href).href + (url.includes("?") ? "&" : "?") + "gmm-thumb=" + w;
+  async function thumbCache() {
+    if (thumbStore !== undefined) return thumbStore;
+    try { thumbStore = typeof caches === "object" && caches ? await caches.open(THUMB_VER) : null; } catch { thumbStore = null; }
+    return thumbStore;
+  }
+  async function encodeThumb(blob, w) {
+    const probe = await createImageBitmap(blob);
+    const scale = Math.min(1, w / Math.max(1, probe.width));
+    const tw = Math.max(1, Math.round(probe.width * scale)), th = Math.max(1, Math.round(probe.height * scale));
+    probe.close();
+    if (scale >= 1) return blob; // already small
+    const bmp = await createImageBitmap(blob, { resizeWidth: tw, resizeHeight: th, resizeQuality: "medium" });
+    try {
+      if (typeof OffscreenCanvas === "function") {
+        const cv = new OffscreenCanvas(tw, th); cv.getContext("2d").drawImage(bmp, 0, 0);
+        return await cv.convertToBlob({ type: "image/webp", quality: 0.82 });
+      }
+      const cv = document.createElement("canvas"); cv.width = tw; cv.height = th; cv.getContext("2d").drawImage(bmp, 0, 0);
+      return await new Promise((ok) => cv.toBlob((b) => ok(b || blob), "image/webp", 0.82));
+    } finally { bmp.close(); }
+  }
+  async function makeThumb(url, w) {
+    const key = thumbKey(url, w);
+    if (thumbMem.has(key)) return thumbMem.get(key);
+    const store = await thumbCache();
+    let small = null;
+    try { const hit = store && await store.match(key); if (hit) small = await hit.blob(); } catch {}
+    if (!small) {
+      const res = await fetch(url, { credentials: "same-origin" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      small = await encodeThumb(await res.blob(), w);
+      try { await store?.put(key, new Response(small, { headers: { "content-type": small.type || "image/webp" } })); } catch {}
+    }
+    const obj = URL.createObjectURL(small);
+    thumbMem.set(key, obj);
+    return obj;
+  }
+  function pumpThumbs() {
+    while (thumbBusy < 3 && thumbWait.length) {
+      const job = thumbWait.shift();
+      if (job.cancelled()) continue;
+      thumbBusy++;
+      makeThumb(job.url, job.w).then(job.done, () => job.done(null)).finally(() => { thumbBusy--; pumpThumbs(); });
+    }
+  }
+  // Puts the small copy (or, if it cannot be made, the original) into img once the card is near the visible area.
+  function thumbInto(img, url, w, isLive) {
+    const key = thumbKey(url, w);
+    if (thumbMem.has(key)) { img.src = thumbMem.get(key); return; }
+    if (!thumbOk) { img.src = url; return; }
+    thumbWait.push({ url, w, cancelled: () => !isLive(), done: (obj) => { if (isLive()) img.src = obj || url; } });
+    pumpThumbs();
+  }
+  cleanups.push(() => { thumbWait.length = 0; for (const u of thumbMem.values()) URL.revokeObjectURL(u); thumbMem.clear(); });
+  function closeCodex() { if (codex) { codex.io?.disconnect(); codex.node.remove(); } codex = null; }
+  // The two list requests, shared by the hover prefetch and the opening itself; fresh lists are reused for 2 minutes.
+  function codexData(id) {
+    if (codexCache && codexCache.run === id && Date.now() - codexCache.at < 120000) return Promise.resolve(codexCache.data);
+    if (codexLoading && codexLoading.run === id) return codexLoading.promise;
+    const promise = loadCodex(id).then((data) => { if (!data.error) codexCache = { run: id, at: Date.now(), data }; return data; })
+      .finally(() => { if (codexLoading && codexLoading.promise === promise) codexLoading = null; });
+    codexLoading = { run: id, promise };
+    return promise;
+  }
+  function prefetchCodex() { const id = runId(); if (id && !codex) codexData(id).catch(() => {}); }
   // Inside the game's own element: full screen shows only that element, so a page on the document body was
   // hidden behind it. The game redraws its content now and then; paint() puts the page back if it was dropped.
   function mountCodex(node) {
@@ -965,9 +1045,7 @@
     codex = { node, tab: "enemies", data: null, sheet, tabs, body, sum };
     if (!id) { body.append(el("div", "cx-empty", "세계를 연 뒤에 볼 수 있어요.")); sum.textContent = ""; return; }
     // Opening it again soon after reuses the last lists instead of asking the server twice.
-    const fresh = codexCache && codexCache.run === id && Date.now() - codexCache.at < 120000;
-    const data = fresh ? codexCache.data : await loadCodex(id);
-    if (!fresh && !data.error) codexCache = { run: id, at: Date.now(), data };
+    const data = await codexData(id);
     if (!codex || codex.node !== node) return;
     codex.data = data;
     if (!(data.enemies || []).length && data.units.length) codex.tab = "units";
@@ -993,22 +1071,44 @@
     for (const b of c.tabs.children) b.setAttribute("aria-pressed", String(b.dataset.tab === c.tab));
     const [, , wide] = TABS.find(([k]) => k === c.tab);
     const list = d[c.tab];
+    c.grids ||= new Map();
+    c.scroll ||= new Map();
+    if (c.shown && c.shown !== c.tab) c.scroll.set(c.shown, c.body.scrollTop);
+    // A tab already drawn is only shown again: its cards and pictures are kept, and its scroll position too.
+    const kept = c.grids.get(c.tab);
+    for (const [k, g] of c.grids) g.hidden = k !== c.tab;
+    for (const n of [...c.body.children]) if (!n.classList.contains("cx-grid")) n.remove();
+    c.shown = c.tab;
+    if (kept) { if (d.error) c.body.prepend(el("div", "cx-empty", d.error)); c.body.scrollTop = c.scroll.get(c.tab) || 0; return; }
     c.body.scrollTop = 0;
-    c.body.replaceChildren();
     if (d.error) c.body.append(el("div", "cx-empty", d.error));
     if (list == null) { c.body.append(el("div", "cx-empty", "적 · 전투 배경 · 메신저 사진은 서버 패치가 있어야 볼 수 있어요.\n이 확장 폴더의 patch/apply-patch.mjs를 실행하고 마리나라를 다시 켜 주세요.")); return; }
     if (!list.length) { c.body.append(el("div", "cx-empty", "아직 모은 그림이 없어요.\n게임을 진행하면 그려진 그림이 여기에 모여요.")); return; }
     const grid = el("div", "cx-grid" + (wide ? " wide" : ""));
     const frag = document.createDocumentFragment();
+    // Thumbnail width in device pixels: a portrait card is drawn about 140–200px wide, a wide one about 220–300px.
+    const tw = Math.min(720, Math.round((wide ? 320 : 240) * Math.min(2, window.devicePixelRatio || 1)));
+    const node = c.node, live = () => !!codex && codex.node === node;
+    c.io ||= new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        if (!en.isIntersecting) continue;
+        c.io.unobserve(en.target);
+        const img = en.target.querySelector("img"), url = en.target.dataset.src;
+        if (img && url) thumbInto(img, url, Number(en.target.dataset.tw), live);
+      }
+    }, { root: c.body, rootMargin: "400px 0px" });
     list.forEach((item, i) => {
       const b = el("button", "cx-item"); b.type = "button"; b.dataset.i = String(i);
       if (item.rarity) b.dataset.r = String(item.rarity);
       if (item.owned === false) { b.dataset.miss = ""; b.title = "미획득"; }
-      const img = el("img"); img.loading = "lazy"; img.decoding = "async"; img.alt = ""; img.src = item.url;
+      const img = el("img"); img.decoding = "async"; img.alt = "";
+      b.dataset.src = item.url; b.dataset.tw = String(tw);
       b.append(img, el("span", "", item.name || "이름 없음"));
       frag.append(b);
     });
     grid.append(frag);
+    for (const b of grid.children) c.io.observe(b);
+    c.grids.set(c.tab, grid);
     // One listener for the whole grid instead of one per picture.
     grid.addEventListener("click", (e) => { const b = e.target.closest(".cx-item"); if (b) view(list, Number(b.dataset.i)); });
     c.body.append(grid);
@@ -1018,7 +1118,8 @@
     if (!c) return;
     c.sheet.querySelector(":scope > .cx-view")?.remove();
     const v = el("div", "cx-view"), img = el("img"), bar = el("div", "cx-bar"), name = el("span");
-    const show = (i) => { at = (i + list.length) % list.length; img.src = list[at].url; name.textContent = (list[at].name || "이름 없음") + (list[at].owned === false ? " · 미획득" : "") + "  (" + (at + 1) + " / " + list.length + ")"; };
+    const warm = (i) => { const u = list[(i + list.length) % list.length]?.url; if (u) { const p = new Image(); p.decoding = "async"; p.src = u; } };
+    const show = (i) => { at = (i + list.length) % list.length; img.src = list[at].url; warm(at + 1); warm(at - 1); name.textContent = (list[at].name || "이름 없음") + (list[at].owned === false ? " · 미획득" : "") + "  (" + (at + 1) + " / " + list.length + ")"; };
     const btn = (t, fn) => { const b = el("button", "", t); b.type = "button"; b.addEventListener("click", (e) => { e.stopPropagation(); fn(); }); return b; };
     bar.append(btn("◀", () => show(at - 1)), name, btn("▶", () => show(at + 1)), btn("닫기", () => v.remove()));
     v.append(img, bar);
