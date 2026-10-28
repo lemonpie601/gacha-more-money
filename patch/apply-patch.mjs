@@ -3,8 +3,10 @@
  *
  * 가챠 포지(gacha-forge) 패키지의 server.mjs에 세 가지 요청을 덧붙입니다.
  *   POST /api/gacha-forge/more-money/status  오늘 남은 충전 횟수
- *   POST /api/gacha-forge/more-money/topup   충전(하루 3번): 에테르 · 자금을 지갑에 넣음
- *   POST /api/gacha-forge/more-money/codex   도감용 적 이미지 · 전투 배경 목록
+ *   POST /api/gacha-forge/more-money/topup     충전(하루 3번): 에테르 · 자금 · 활력 · 반짝이 · 소환권을 지갑에 넣음
+ *   POST /api/gacha-forge/more-money/exchange  에테르로 소환권 사기
+ *   POST /api/gacha-forge/more-money/codex     도감용 적 이미지 · 전투 배경 목록
+ * 그리고 소환이 에테르 대신 소환권을 씁니다: 상시 배너는 「별의 서약」(상시 소환권), 한정 배너는 「월식의 서약」(한정 소환권).
  * 마리나라는 설치된 패키지 파일의 해시를 검사하므로, 파일과 함께 설치 기록(installed.json)의 해시도 고칩니다.
  *
  * 사용법 (마리나라를 끈 상태에서):
@@ -23,14 +25,32 @@ const PACKAGE_ID = "gacha-forge";
 const HEAD = "/*gacha-more-money:head*/";
 const START = "/*gacha-more-money:start*/";
 const END = "/*gacha-more-money:end*/";
+// The summon's aether payment is replaced in place; the original text rides along (base64) so --restore and
+// a re-run can put it back exactly.
+const SWAP = /\/\*gacha-more-money:swap:([A-Za-z0-9+/=]*)\*\/[\s\S]*?\/\*gacha-more-money:swapend\*\//g;
 
-// What each pack puts in the wallet (one summon costs 160 aether). Keep in sync with extension.js PACKS.
+// What each pack puts in the wallet (one summon used to cost 160 aether). Keep in sync with extension.js PACKS.
+// gmmTicketStd / gmmTicketLtd: standard and limited summon tickets, kept in the wallet beside aether.
 const PACKS = {
   "aether-s": { aether: 1600 },
-  "aether-l": { aether: 4800 },
-  "funds": { funds: 100000 },
+  "aether-m": { aether: 4800 },
+  "aether-l": { aether: 9600 },
+  "funds-s": { funds: 100000 },
+  "funds-l": { funds: 300000 },
+  "vigor": { vigor: 60 },
+  "glimmer": { glimmer: 300 },
+  "ticket-std": { gmmTicketStd: 10 },
+  "ticket-ltd": { gmmTicketLtd: 10 },
+  "starter": { aether: 1600, funds: 50000, gmmTicketLtd: 1 },
 };
 const DAILY = 3;
+// Buying tickets with aether (any number of times): what it costs and what it gives.
+const EXCHANGE = {
+  "std-1": { cost: 160, give: { gmmTicketStd: 1 } },
+  "std-10": { cost: 1600, give: { gmmTicketStd: 10 } },
+  "ltd-1": { cost: 160, give: { gmmTicketLtd: 1 } },
+  "ltd-10": { cost: 1600, give: { gmmTicketLtd: 10 } },
+};
 
 const args = process.argv.slice(2);
 const restore = args.includes("--restore");
@@ -45,7 +65,7 @@ function findDataDir() {
 const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
 
 function strip(src) {
-  let out = src;
+  let out = src.replace(SWAP, (_, b64) => Buffer.from(b64, "base64").toString("utf8"));
   const h = out.indexOf(HEAD);
   if (h >= 0) { const e = out.indexOf(HEAD, h + HEAD.length); if (e < 0) throw new Error("머리 표식이 깨져 있습니다."); out = out.slice(0, h) + out.slice(e + HEAD.length); }
   const s = out.indexOf(START);
@@ -65,22 +85,41 @@ function inject(src) {
   const [, writeRun] = need(/await (\w+)\(\w+,\w+,\w+\)\?\{ok:!0/, seg, "저장");
   const [, pub] = need(/wallet:(\w+)\(\w+,\w+\)\}/, seg, "지갑 응답");
   const [, store, pkg] = need(/await (\w+)\.getById\((\w+)\.id,\w+\(\w+\)\),\w+=\w+&&\w+\.data\|\|\{\};return\{enemies:/, src, "전투 이미지 저장소");
+  // The summon: which pool (standard / featured) and where it takes the aether.
+  const summon = need(/\w+\.post\("\/summon",async \w+=>\{/, src, "소환 처리");
+  const sseg = src.slice(summon.index, summon.index + 3000);
+  const [, pool] = need(/(\w+)=\w+\.split\("-"\)\[1\]==="standard"\?"standard":"featured"/, sseg, "소환 배너 종류");
+  const pay = need(/let (\w+)=\w+\*(\w+);if\(\(Number\((\w+)\.wallet\.aether\)\|\|0\)<\1\)return\{ok:!1,error:"insufficient-aether"\};\3\.wallet\.aether=\(Number\(\3\.wallet\.aether\)\|\|0\)-\1;/, sseg, "소환 비용");
+  const [payText, spent, count, run] = pay;
+  const ticketPay = `let ${spent}=0,__gmmT=${pool}==="standard"?"gmmTicketStd":"gmmTicketLtd",__gmmH=Math.max(0,Math.floor(Number(${run}.wallet[__gmmT])||0));`
+    + `if(__gmmH<${count})return{ok:!1,error:"insufficient-tickets",ticket:__gmmT,need:${count},held:__gmmH};${run}.wallet[__gmmT]=__gmmH-${count};`;
+  const swapped = "/*gacha-more-money:swap:" + Buffer.from(payText, "utf8").toString("base64") + "*/" + ticketPay + "/*gacha-more-money:swapend*/";
 
-  const head = HEAD + "const __gmmPacks=" + JSON.stringify(PACKS) + ",__gmmDaily=" + DAILY + ";"
+  const head = HEAD + "const __gmmPacks=" + JSON.stringify(PACKS) + ",__gmmExchange=" + JSON.stringify(EXCHANGE) + ",__gmmDaily=" + DAILY + ";"
+    + "function __gmmTickets(W){W=W||{};return{std:Math.max(0,Math.floor(Number(W.gmmTicketStd)||0)),ltd:Math.max(0,Math.floor(Number(W.gmmTicketLtd)||0))}}"
     + "function __gmmToday(){let d=new Date();return d.getFullYear()+\"-\"+(d.getMonth()+1)+\"-\"+d.getDate()}"
     + "function __gmmLeft(S){let day=__gmmToday(),m=S&&S.moreMoney,used=m&&m.day===day?Math.max(0,Number(m.count)||0):0;return{day,used,left:Math.max(0,__gmmDaily-used),daily:__gmmDaily}}"
     + HEAD;
   const check = `let u=p&&p.body||{},o=${str}(u.runId);if(!o)return{ok:!1,error:"bad-request"};let{data:g}=await ${readIndex}();if(!${hasRun}(g,o))return{ok:!1,error:"bad-request"};`;
   const list = (obj) => `Object.entries(${obj}||{}).filter(([,v])=>v&&${str}(v.url)).map(([key,v])=>({key,name:${str}(v.name)||key,url:${str}(v.url)}))`;
   const routes = START
-    + `${router}.post("/more-money/status",async p=>{${check}let{data:S}=await ${readRun}(o);return{ok:!0,packs:__gmmPacks,...__gmmLeft(S)}}),`
+    + `${router}.post("/more-money/status",async p=>{${check}let{data:S}=await ${readRun}(o);return{ok:!0,packs:__gmmPacks,exchange:__gmmExchange,tickets:__gmmTickets(S&&S.wallet),...__gmmLeft(S)}}),`
     + `${router}.post("/more-money/topup",async p=>{${check}let k=${str}(u.pack),P=Object.prototype.hasOwnProperty.call(__gmmPacks,k)?__gmmPacks[k]:null;if(!P)return{ok:!1,error:"bad-request"};`
     + `await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),t=__gmmLeft(S);if(t.left<=0)return{ok:!1,error:"daily-limit",...t};`
     + `for(let[c,q]of Object.entries(P))M[c]=(Number(M[c])||0)+q;S.moreMoney={day:t.day,count:t.used+1};S.wallet=M;`
-    + `return await ${writeRun}(o,b,S)?{ok:!0,pack:k,granted:P,wallet:${pub}(M,S),...__gmmLeft(S)}:{ok:!1,error:"write-conflict"}}),`
+    + `return await ${writeRun}(o,b,S)?{ok:!0,pack:k,granted:P,wallet:${pub}(M,S),tickets:__gmmTickets(M),...__gmmLeft(S)}:{ok:!1,error:"write-conflict"}}),`
+    + `${router}.post("/more-money/exchange",async p=>{${check}let k=${str}(u.item),X=Object.prototype.hasOwnProperty.call(__gmmExchange,k)?__gmmExchange[k]:null;if(!X)return{ok:!1,error:"bad-request"};`
+    + `await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),h=Math.max(0,Number(M.aether)||0);if(h<X.cost)return{ok:!1,error:"insufficient-aether",need:X.cost,held:h};`
+    + `M.aether=h-X.cost;for(let[c,q]of Object.entries(X.give))M[c]=(Number(M[c])||0)+q;S.wallet=M;`
+    + `return await ${writeRun}(o,b,S)?{ok:!0,item:k,spent:X.cost,granted:X.give,wallet:${pub}(M,S),tickets:__gmmTickets(M)}:{ok:!1,error:"write-conflict"}}),`
     + `${router}.post("/more-money/codex",async p=>{${check}let c=await ${store}.getById(${pkg}.id,o+":combat-art"),d=c&&c.data||{};return{ok:!0,enemies:${list("d.enemies")},battle:${list("d.modes")}}}),`
     + END;
-  return head + src.slice(0, shop.index) + routes + src.slice(shop.index);
+  const payAt = summon.index + pay.index;
+  let out = src.slice(0, payAt) + swapped + src.slice(payAt + payText.length);
+  // The shop handler sits before or after the summon; find it again in the changed text.
+  const shopAt = out.indexOf(shop[0]);
+  out = out.slice(0, shopAt) + routes + out.slice(shopAt);
+  return head + out;
 }
 
 function syntaxCheck(code) {

@@ -1,5 +1,6 @@
-/* Gacha More Money v1.0.1 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
- *  - 상점 → 충전소: 에테르 · 자금 팩을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
+/* Gacha More Money v1.1.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+ *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 반짝이 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
+ *  - 소환은 에테르 대신 소환권: 상시 배너는 별의 서약, 한정 배너는 월식의 서약. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
  * The wallet lives in the game's own save, which no browser request can change, so the top-up and the enemy list
  * need the server patch in patch/apply-patch.mjs (POST /api/gacha-forge/more-money/*). Without it the shop shows
@@ -38,13 +39,30 @@
   let disposed = false;
   const cleanups = [];
 
-  /* ═════════════ Packs (keep in sync with patch/apply-patch.mjs PACKS) ═════════════ */
+  /* ═════════════ Packs (keep in sync with patch/apply-patch.mjs PACKS / EXCHANGE) ═════════════ */
+  // The two summon tickets: the standard banner takes 별의 서약, the limited (featured) banner 월식의 서약.
+  const TICKETS = {
+    std: { key: "gmmTicketStd", name: "별의 서약", kind: "상시 소환권", tone: "std" },
+    ltd: { key: "gmmTicketLtd", name: "월식의 서약", kind: "한정 소환권", tone: "ltd" },
+  };
   const PACKS = [
-    { id: "aether-s", name: "에테르 한 줌", icon: "✦", grant: "에테르 1,600", note: "10회 소환", price: "₩33,000", tone: "aether" },
-    { id: "aether-l", name: "에테르 상자", icon: "✦", grant: "에테르 4,800", note: "30회 소환", price: "₩99,000", tone: "aether", best: true },
-    { id: "funds", name: "자금 자루", icon: "◎", grant: "자금 100,000", note: "강화 · 승급용", price: "₩11,000", tone: "funds" },
+    { id: "starter", name: "첫걸음 꾸러미", icon: "★", grant: "에테르 1,600 · 자금 50,000 · 월식의 서약 1장", note: "가장 알찬 구성", price: "₩4,400", tone: "gift", best: "추천" },
+    { id: "ticket-ltd", name: "월식의 서약 묶음", icon: "☾", grant: "월식의 서약 10장", note: "한정 배너 10회 소환", price: "₩49,000", tone: "ltd", best: "인기!" },
+    { id: "ticket-std", name: "별의 서약 묶음", icon: "✧", grant: "별의 서약 10장", note: "상시 배너 10회 소환", price: "₩29,000", tone: "std" },
+    { id: "aether-s", name: "에테르 한 줌", icon: "✦", grant: "에테르 1,600", note: "소환권 10장어치", price: "₩33,000", tone: "aether" },
+    { id: "aether-m", name: "에테르 상자", icon: "✦", grant: "에테르 4,800", note: "소환권 30장어치", price: "₩99,000", tone: "aether" },
+    { id: "aether-l", name: "에테르 보물고", icon: "✦", grant: "에테르 9,600", note: "소환권 60장어치", price: "₩199,000", tone: "aether" },
+    { id: "funds-s", name: "자금 자루", icon: "◎", grant: "자금 100,000", note: "레벨업 · 승급용", price: "₩11,000", tone: "funds" },
+    { id: "funds-l", name: "자금 금괴", icon: "◎", grant: "자금 300,000", note: "레벨업 · 승급용", price: "₩29,000", tone: "funds" },
+    { id: "vigor", name: "활력 드링크", icon: "ϟ", grant: "활력 +60", note: "최대치를 넘어 채워져요", price: "₩5,500", tone: "vigor" },
+    { id: "glimmer", name: "반짝이 주머니", icon: "✺", grant: "반짝이 300", note: "상점 물건 구매용", price: "₩8,800", tone: "glimmer" },
   ];
   const DAILY = 3;
+  // Tickets for aether, as often as you like: one summon still costs what it did (160 aether).
+  const EXCHANGE = [
+    { id: "std-1", ticket: "std", qty: 1, cost: 160 }, { id: "std-10", ticket: "std", qty: 10, cost: 1600 },
+    { id: "ltd-1", ticket: "ltd", qty: 1, cost: 160 }, { id: "ltd-10", ticket: "ltd", qty: 10, cost: 1600 },
+  ];
 
   /* ═════════════ Styles inside the game (the shop) ═════════════ */
   const GAME_CSS = `
@@ -61,12 +79,41 @@
 .gmm-pane .gmm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--f, 10px) * 15), 1fr)); gap: .9em; }
 .gmm-pack { position: relative; display: flex; flex-direction: column; align-items: center; gap: .35em; padding: 1em .8em .9em; border-radius: 20px;
   background: var(--gfx-card, #FFFDF5); border: 3px solid var(--gfx-line, #6B4528); box-shadow: 0 .3em 0 var(--gfx-line, #6B4528); text-align: center; }
-.gmm-pack[data-best]::before { content: "인기!"; position: absolute; top: -.75em; right: .8em; padding: .05em .7em; border-radius: 999px; background: #FF6F91; color: #fff;
+.gmm-pack[data-best]::before { content: attr(data-best); position: absolute; top: -.75em; right: .8em; padding: .05em .7em; border-radius: 999px; background: #FF6F91; color: #fff;
   border: 2px solid var(--gfx-line, #6B4528); font-size: calc(var(--f, 10px) * .85); rotate: 6deg; }
 .gmm-pack .gmm-ic { display: grid; place-items: center; width: 2.6em; height: 2.6em; border-radius: 50%; font-size: calc(var(--f, 10px) * 2); color: #fff;
   border: 3px solid var(--gfx-line, #6B4528); box-shadow: 0 .14em 0 var(--gfx-line, #6B4528), inset 0 -.25em 0 rgba(0,0,0,.12); }
 .gmm-pack[data-tone="aether"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #D9C8FF, #8C6CF0); }
 .gmm-pack[data-tone="funds"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #FFE9A8, #F2B600); }
+.gmm-pack[data-tone="std"] .gmm-ic, .gmm-tix [data-tone="std"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #CDEBFF, #3E8EDB); }
+.gmm-pack[data-tone="ltd"] .gmm-ic, .gmm-tix [data-tone="ltd"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #FFC9DA, #B0306A); }
+.gmm-pack[data-tone="vigor"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #C9F5D2, #2FA97C); }
+.gmm-pack[data-tone="glimmer"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #FFE1C9, #F2884B); }
+.gmm-pack[data-tone="gift"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #FFF1C9, #FF8FB1); }
+.gmm-pane h3 { margin: .4em 0 0; font-weight: 400; font-size: calc(var(--f, 10px) * 1.25); display: flex; align-items: baseline; gap: .5em; flex-wrap: wrap; }
+.gmm-pane h3 small { font-size: .7em; opacity: .7; }
+.gmm-pane .gmm-xgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--f, 10px) * 20), 1fr)); gap: .8em; }
+.gmm-x { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5em .6em; padding: .55em .8em; border-radius: 18px;
+  background: var(--gfx-card, #FFFDF5); border: 3px solid var(--gfx-line, #6B4528); box-shadow: 0 .24em 0 var(--gfx-line, #6B4528); }
+.gmm-x .gmm-ic, .gmm-tix .gmm-ic { display: grid; place-items: center; width: 2em; height: 2em; border-radius: 50%; color: #fff; font-size: calc(var(--f, 10px) * 1.4);
+  border: 2.5px solid var(--gfx-line, #6B4528); box-shadow: 0 .1em 0 var(--gfx-line, #6B4528); }
+.gmm-x[data-tone="std"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #CDEBFF, #3E8EDB); }
+.gmm-x[data-tone="ltd"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #FFC9DA, #B0306A); }
+.gmm-x .gmm-nm { display: flex; flex-direction: column; line-height: 1.25; white-space: nowrap; min-width: 0; font-size: calc(var(--f, 10px) * 1.1); }
+.gmm-x .gmm-nm small { font-size: .78em; opacity: .7; }
+.gmm-x .gmm-have { font-size: calc(var(--f, 10px) * .9); opacity: .85; white-space: nowrap; }
+.gmm-x .gmm-buys { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: .4em; }
+.gmm-x button, .gmm-tix button { cursor: pointer; font: inherit; white-space: nowrap; padding: .25em .7em; border-radius: 999px; color: #fff; background: linear-gradient(180deg, #A98CF5, #7B5BE0);
+  border: 2.5px solid var(--gfx-line, #6B4528); box-shadow: 0 .16em 0 var(--gfx-line, #6B4528); }
+.gmm-x button:active:not(:disabled), .gmm-tix button:active:not(:disabled) { translate: 0 .12em; box-shadow: 0 .04em 0 var(--gfx-line, #6B4528); }
+.gmm-x button:disabled, .gmm-tix button:disabled { filter: grayscale(.8); opacity: .6; cursor: default; }
+/* The summon screen: tickets held for this banner, and buying more right there. */
+.gmm-tix { display: flex; align-items: center; justify-content: center; gap: .5em; flex-wrap: wrap; margin: .2em 0 .5em; font-family: "Jua", var(--display, inherit), sans-serif;
+  color: var(--gfx-text, var(--on-surface, #4A3020)); }
+.gmm-tix .gmm-hold { display: inline-flex; align-items: center; gap: .45em; padding: .2em .9em .2em .25em; border-radius: 999px; background: var(--gfx-card, #FFFDF5);
+  border: 2.5px solid var(--gfx-line, #6B4528); box-shadow: 0 .16em 0 var(--gfx-line, #6B4528); }
+.gmm-tix .gmm-hold b { color: var(--gfx-accent, #F0763A); }
+.gmm-tix .gmm-note { width: 100%; text-align: center; font-size: .85em; opacity: .85; }
 .gmm-pack .gmm-nm { font-size: calc(var(--f, 10px) * 1.25); }
 .gmm-pack .gmm-gr { font-size: calc(var(--f, 10px) * 1.05); color: var(--gfx-accent, #F0763A); }
 .gmm-pack .gmm-nt { font-size: calc(var(--f, 10px) * .8); opacity: .75; }
@@ -105,6 +152,8 @@
     catch (e) { status = null; patchMissing = unpatched(e); if (!patchMissing) lastNote = "남은 횟수를 불러오지 못했어요 (" + e.message + ")."; }
     schedule();
   }
+  const held = (t) => (status && status.tickets ? Number(status.tickets[t]) || 0 : null);
+  const aether = () => { const w = host()?._wallet; return w && Number.isFinite(Number(w.aether)) ? Number(w.aether) : null; };
   // The top bar reads the game's own copy of the wallet; hand it the new one so it shows at once.
   function adoptWallet(wallet) {
     const h = host();
@@ -131,6 +180,37 @@
     buying = "";
     schedule();
   }
+  // Aether for tickets: no "pay?" step, it is the game's own currency (like the shop's glimmer items).
+  async function exchange(x) {
+    if (buying) return;
+    buying = x.id; schedule();
+    const tk = TICKETS[x.ticket];
+    try {
+      const data = await gf("/more-money/exchange", { runId: runId(), item: x.id });
+      status = { ...(status || {}), tickets: data.tickets };
+      lastNote = tk.name + " " + x.qty + "장을 받았어요! (에테르 -" + fmt(x.cost) + ")";
+      adoptWallet(data.wallet);
+    } catch (e) {
+      if (unpatched(e)) patchMissing = true;
+      else lastNote = e.message === "insufficient-aether" ? "에테르가 모자라요. (" + tk.name + " " + x.qty + "장 = 에테르 " + fmt(x.cost) + ")" : "교환하지 못했어요 (" + e.message + ").";
+    }
+    buying = "";
+    schedule();
+  }
+  function exchangeRow(t) {
+    const tk = TICKETS[t], have = held(t), a = aether();
+    const row = el("div", "gmm-x"); row.dataset.tone = tk.tone;
+    const nm = el("span", "gmm-nm"); nm.append(tk.name, el("small", "", tk.kind));
+    const buys = el("span", "gmm-buys");
+    for (const x of EXCHANGE.filter((x) => x.ticket === t)) {
+      const b = el("button", "", buying === x.id ? "교환 중…" : "+" + x.qty + " · ✦" + fmt(x.cost)); b.type = "button";
+      b.disabled = !!buying || patchMissing || (a != null && a < x.cost);
+      b.addEventListener("click", (e) => { e.stopPropagation(); exchange(x); });
+      buys.append(b);
+    }
+    row.append(el("span", "gmm-ic", t === "std" ? "✧" : "☾"), nm, el("span", "gmm-have", have == null ? "" : "보유 " + fmt(have) + "장"), buys);
+    return row;
+  }
   function paintShop(root) {
     const screen = root.querySelector('[data-screen="shop"]');
     if (!screen) { shopOpen = false; return; }
@@ -154,12 +234,13 @@
     const n = cat.querySelector(".sh-cat-n");
     if (n.textContent !== count) n.textContent = count;
     cat.classList.toggle("on", shopOpen);
-    for (const other of rail.querySelectorAll(":scope > .sh-cat:not(.gmm-cat)")) if (shopOpen && other.classList.contains("on")) { other.classList.remove("on"); other.dataset.gmmWasOn = "1"; }
+    for (const other of rail.querySelectorAll(":scope > .sh-cat:not(.gmm-cat)")) if (shopOpen && other.classList.contains("on")) other.classList.remove("on");
     pane.classList.toggle("gmm-open", shopOpen);
     let mine = pane.querySelector(":scope > .gmm-pane");
     if (!shopOpen) { mine?.remove(); return; }
-    const key = JSON.stringify([left, buying, confirming, patchMissing, lastNote]);
+    const key = JSON.stringify([left, buying, confirming, patchMissing, lastNote, status && status.tickets, aether()]);
     if (mine && mine.dataset.key === key) return;
+    const scroll = mine ? mine.scrollTop : 0;
     mine?.remove();
     mine = el("div", "gmm-pane"); mine.dataset.key = key;
     const top = el("div", "gmm-top");
@@ -168,9 +249,12 @@
     mine.append(top);
     if (patchMissing) mine.append(el("div", "gmm-msg", "충전하려면 서버 패치가 필요해요.\n마리나라를 끄고, 이 확장 폴더의 patch/apply-patch.mjs를 실행한 뒤 다시 켜 주세요.\n(자세한 방법은 README 참고)"));
     if (lastNote) mine.append(el("div", "gmm-msg", lastNote));
+    const h1 = el("h3", "", "소환권 교환"); h1.append(el("small", "", "에테르로 사요 · 상시 배너는 별의 서약, 한정 배너는 월식의 서약으로만 소환할 수 있어요"));
+    const xgrid = el("div", "gmm-xgrid"); xgrid.append(exchangeRow("std"), exchangeRow("ltd"));
+    const h2 = el("h3", "", "오늘의 충전"); h2.append(el("small", "", "모든 상품을 합쳐 하루 " + DAILY + "번"));
     const grid = el("div", "gmm-grid");
     for (const p of PACKS) {
-      const card = el("div", "gmm-pack"); card.dataset.tone = p.tone; if (p.best) card.dataset.best = "";
+      const card = el("div", "gmm-pack"); card.dataset.tone = p.tone; if (p.best) card.dataset.best = p.best;
       const b = el("button", "", buying === p.id ? "결제 중…" : confirming === p.id ? p.price + " 결제할까요?" : p.price); b.type = "button";
       if (confirming === p.id) b.dataset.ask = "";
       b.disabled = !!buying || patchMissing || left === 0;
@@ -178,8 +262,53 @@
       card.append(el("span", "gmm-ic", p.icon), el("span", "gmm-nm", p.name), el("span", "gmm-gr", p.grant), el("span", "gmm-nt", p.note), b);
       grid.append(card);
     }
-    mine.append(grid, el("div", "gmm-fine", "놀이용 가상 결제예요. 실제 돈은 나가지 않으며, 충전 횟수는 서버 날짜 기준으로 매일 초기화돼요."));
+    mine.append(h1, xgrid, h2, grid, el("div", "gmm-fine", "놀이용 가상 결제예요. 실제 돈은 나가지 않으며, 충전 횟수는 서버 날짜 기준으로 매일 초기화돼요."));
     pane.append(mine);
+    mine.scrollTop = scroll;
+  }
+
+  /* ═════════════ Summon: tickets instead of aether ═════════════
+   * With the patch the server takes 별의 서약 (standard banners) or 월식의 서약 (limited banners) for each pull.
+   * The game still draws its aether price and greys its buttons by aether; here the price reads in tickets and
+   * the buttons follow the tickets held (the game reads aria-disabled when pressed). */
+  let summonSeen = false;
+  function paintSummon(root) {
+    const screen = root.querySelector('[data-screen="banner"]');
+    const pulls = screen?.querySelector(".pulls");
+    if (!pulls) { if (summonSeen) { summonSeen = false; loadStatus(true); } return; }
+    if (!summonSeen) { summonSeen = true; loadStatus(true); }
+    if (patchMissing || !status) { pulls.previousElementSibling?.classList.contains("gmm-tix") && pulls.previousElementSibling.remove(); return; }
+    const bannerId = String(host()?._summonBannerId || "char-featured");
+    const t = bannerId.split("-")[1] === "standard" ? "std" : "ltd", tk = TICKETS[t], have = held(t) ?? 0;
+    for (const b of pulls.querySelectorAll("[data-pull]")) {
+      const n = Number(b.dataset.pull) === 10 ? 10 : 1;
+      const cost = b.querySelector(".cost"), label = tk.name + " ×" + n + (n === 10 ? " · 4★ 이상 1회 보장" : "");
+      if (cost && cost.textContent !== label) cost.textContent = label;
+      const off = have < n ? "true" : null;
+      if (b.getAttribute("aria-disabled") !== off) { if (off) b.setAttribute("aria-disabled", off); else b.removeAttribute("aria-disabled"); }
+      if (!b.dataset.gmmWatch) {
+        b.dataset.gmmWatch = "1";
+        // After a pull the server has taken the tickets; read the count again once the results are in.
+        b.addEventListener("click", () => { if (b.getAttribute("aria-disabled") !== "true") setTimeout(() => loadStatus(true), 1500); });
+      }
+    }
+    let tix = pulls.previousElementSibling?.classList.contains("gmm-tix") ? pulls.previousElementSibling : null;
+    const key = JSON.stringify([t, have, buying, aether(), lastNote]);
+    if (tix && tix.dataset.key === key) return;
+    tix?.remove();
+    tix = el("div", "gmm-tix"); tix.dataset.key = key;
+    const hold = el("span", "gmm-hold"); hold.dataset.tone = tk.tone;
+    hold.append(el("span", "gmm-ic", t === "std" ? "✧" : "☾"), tk.name + " ", el("b", "", fmt(have)), "장");
+    tix.append(hold);
+    const a = aether();
+    for (const x of EXCHANGE.filter((x) => x.ticket === t)) {
+      const b = el("button", "", buying === x.id ? "교환 중…" : "+" + x.qty + "장 · ✦" + fmt(x.cost)); b.type = "button";
+      b.disabled = !!buying || (a != null && a < x.cost);
+      b.addEventListener("click", (e) => { e.stopPropagation(); exchange(x); });
+      tix.append(b);
+    }
+    if (have < 1) tix.append(el("span", "gmm-note", "이 배너는 " + tk.name + "(" + tk.kind + ")으로 소환해요. 에테르로 바꾸거나 충전소에서 구할 수 있어요."));
+    pulls.before(tix);
   }
 
   /* ═════════════ Lobby: [도감] button ═════════════ */
@@ -366,6 +495,7 @@
     ensureGameSheet(root);
     if (codex && !codex.node.isConnected) mountCodex(codex.node);
     paintShop(root);
+    paintSummon(root);
     paintCodexButton(root);
   }
   // The game's element comes and goes with the Home tab; look for it now and then.
@@ -379,7 +509,7 @@
     for (const fn of cleanups) { try { fn(); } catch {} }
     const root = host()?.shadowRoot;
     if (root) {
-      for (const n of root.querySelectorAll(".gmm-cat, .gmm-pane, .gmm-codex-btn")) n.remove();
+      for (const n of root.querySelectorAll(".gmm-cat, .gmm-pane, .gmm-codex-btn, .gmm-tix")) n.remove();
       for (const n of root.querySelectorAll(".gmm-open")) n.classList.remove("gmm-open");
       if (gameSheet) root.adoptedStyleSheets = root.adoptedStyleSheets.filter((s) => s !== gameSheet);
     }
