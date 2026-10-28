@@ -1,4 +1,4 @@
-/* Gacha More Money v1.5.1 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.5.2 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 반짝이 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -67,7 +67,7 @@
   ];
 
   /* ═════════════ Icons ═════════════
-   * Small drawings in a 48×48 box, outlined in the theme's line colour (class "ln") with a white shine ("hi"). */
+   * Small drawings in a 48×48 box: soft gradients, thin edges in each shape's own deeper colour, a white shine. */
   const star4 = (x, y, r, w = r * 0.28) => `M${x} ${y - r}Q${x + w} ${y - w} ${x + r} ${y}Q${x + w} ${y + w} ${x} ${y + r}Q${x - w} ${y + w} ${x - r} ${y}Q${x - w} ${y - w} ${x} ${y - r}Z`;
   // A bright, glossy ticket: a gradient body edged in its own deeper colour (not the dark outline), a white
   // inner frame and perforation, and a gold emblem. id names its gradients inside the shadow root.
@@ -76,47 +76,63 @@
     + '<stop offset="0" stop-color="' + light + '"/><stop offset="1" stop-color="' + mid + '"/></linearGradient>'
     + '<linearGradient id="gmm-' + id + '-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF8D2"/><stop offset="1" stop-color="#FFC93C"/></linearGradient></defs>'
     + '<g transform="rotate(-10 24 24)">'
-    + '<path fill="url(#gmm-' + id + ')" stroke="' + edge + '" stroke-width="2.4" stroke-linejoin="round" d="' + TICKET_PATH + '"/>'
+    + '<path fill="url(#gmm-' + id + ')" stroke="' + edge + '" stroke-width="1.8" stroke-linejoin="round" d="' + TICKET_PATH + '"/>'
     + '<path fill="#fff" opacity=".28" d="M8.6 14.6h30.8a1.8 1.8 0 0 1 1.8 1.8v3.6c-9 2.4-23 2.4-34.4 0v-3.6a1.8 1.8 0 0 1 1.8-1.8z"/>'
     + '<rect x="9" y="16.4" width="30" height="15.2" rx="2.2" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="1.2"/>'
     + '<path d="M16 18.5v11" stroke="#fff" stroke-opacity=".9" stroke-width="1.6" stroke-dasharray="1.6 2.2" stroke-linecap="round"/>'
     + emblem.replaceAll("GOLD", "url(#gmm-" + id + "-gold)").replaceAll("EDGE", edge) + '</g>';
-  const crystal = (cx, cy, s, fill, face) => {
+  // The rest drawn the same way: soft gradients, a thin edge in each shape's own deeper colour, white shine.
+  const grad = (id, top, bottom) => '<linearGradient id="gmm-' + id + '" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="' + top + '"/><stop offset="1" stop-color="' + bottom + '"/></linearGradient>';
+  const AETHER = grad("cr", "#E2D6FF", "#8F6AF2") + grad("crf", "#FFFFFF", "#C9B6FF");
+  const GOLD = grad("gt", "#FFF3B4", "#FFC93C") + grad("gs", "#F9BE2A", "#D98E00");
+  const crystal = (cx, cy, s) => {
     const p = (x, y) => (cx + x * s).toFixed(1) + " " + (cy + y * s).toFixed(1);
-    return '<path class="ln" fill="' + fill + '" d="M' + p(-6, -12) + "L" + p(6, -12) + "L" + p(12, -4) + "L" + p(0, 13) + "L" + p(-12, -4) + 'Z"/>'
-      + '<path fill="' + face + '" d="M' + p(-3, -4) + "L" + p(3, -4) + "L" + p(0, 13) + 'Z"/>'
-      + '<path class="ln" fill="none" stroke-width="1.6" d="M' + p(-12, -4) + "L" + p(12, -4) + "M" + p(-6, -12) + "L" + p(-3, -4) + "L" + p(0, 13) + "M" + p(6, -12) + "L" + p(3, -4) + '"/>'
-      + '<path class="hi" d="M' + p(-4.6, -10.4) + "L" + p(-1.2, -10.4) + "L" + p(-2.6, -5.6) + "L" + p(-8.6, -5.6) + 'Z"/>';
+    return '<path fill="url(#gmm-cr)" stroke="#6E4BD8" stroke-width="1.4" stroke-linejoin="round" d="M' + p(-6, -12) + "L" + p(6, -12) + "L" + p(12, -4) + "L" + p(0, 13) + "L" + p(-12, -4) + 'Z"/>'
+      + '<path fill="url(#gmm-crf)" opacity=".75" d="M' + p(-6, -12) + "L" + p(6, -12) + "L" + p(3, -4) + "L" + p(-3, -4) + 'Z"/>'
+      + '<path fill="#fff" opacity=".22" d="M' + p(-3, -4) + "L" + p(3, -4) + "L" + p(0, 13) + 'Z"/>'
+      + '<path fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".9" stroke-linejoin="round" d="M' + p(-12, -4) + "L" + p(12, -4) + "M" + p(-6, -12) + "L" + p(-3, -4) + "L" + p(0, 13) + "M" + p(6, -12) + "L" + p(3, -4) + "L" + p(0, 13) + '"/>'
+      + '<path fill="#fff" opacity=".8" d="M' + p(-4.4, -10.6) + "L" + p(-1.6, -10.6) + "L" + p(-2.6, -6.6) + "L" + p(-7.6, -6.6) + 'Z"/>';
   };
-  const coin = (x, y) => '<path class="ln" fill="#E9A400" d="M' + (x - 14) + " " + y + 'v5a14 5.4 0 0 0 28 0v-5"/>'
-    + '<ellipse class="ln" fill="#FFD34E" cx="' + x + '" cy="' + y + '" rx="14" ry="5.4"/>'
-    + '<ellipse fill="none" stroke="#E9A400" stroke-width="1.5" cx="' + x + '" cy="' + y + '" rx="8.5" ry="3"/>';
-  const twinkle = (x, y, r) => '<path fill="#FFF6C8" class="ln" stroke-width="1.2" d="' + star4(x, y, r) + '"/>';
+  const coin = (x, y) => '<path fill="url(#gmm-gs)" stroke="#C98200" stroke-width="1.2" stroke-linejoin="round" d="M' + (x - 14) + " " + y + 'v5a14 5.4 0 0 0 28 0v-5"/>'
+    + '<ellipse fill="url(#gmm-gt)" stroke="#C98200" stroke-width="1.2" cx="' + x + '" cy="' + y + '" rx="14" ry="5.4"/>'
+    + '<ellipse fill="none" stroke="#E9A400" stroke-opacity=".8" stroke-width="1" cx="' + x + '" cy="' + y + '" rx="8.5" ry="3"/>'
+    + '<path fill="#fff" opacity=".7" d="M' + (x - 9) + " " + (y - 2.6) + "q4 -1.6 9 -1.4q-4 .6 -7.4 2.4z" + '"/>';
+  const twinkle = (x, y, r) => '<path fill="#FFE27A" d="' + star4(x, y, r) + '"/><path fill="#fff" d="' + star4(x, y, r * 0.45) + '"/>';
   const ICONS = {
-    std: ticket("std", "#B8EEFF", "#3DB2F5", "#1C8AD6", '<path fill="GOLD" stroke="EDGE" stroke-width="1.6" stroke-linejoin="round" d="' + star4(28.5, 24, 6.8) + '"/>'
+    std: ticket("std", "#B8EEFF", "#3DB2F5", "#1C8AD6", '<path fill="GOLD" stroke="EDGE" stroke-width="1.2" stroke-linejoin="round" d="' + star4(28.5, 24, 6.8) + '"/>'
       + '<path fill="#fff" d="' + star4(36.5, 19, 2.2) + '"/><circle fill="#fff" cx="35" cy="29" r="1"/>'),
-    ltd: ticket("ltd", "#FFD0DE", "#FF5C8A", "#D6336A", '<path fill="GOLD" stroke="EDGE" stroke-width="1.6" stroke-linejoin="round" d="M31.4 17.2a7 7 0 1 0 0 13.6a5.6 5.6 0 1 1 0-13.6z"/>'
+    ltd: ticket("ltd", "#FFD0DE", "#FF5C8A", "#D6336A", '<path fill="GOLD" stroke="EDGE" stroke-width="1.2" stroke-linejoin="round" d="M31.4 17.2a7 7 0 1 0 0 13.6a5.6 5.6 0 1 1 0-13.6z"/>'
       + '<path fill="#fff" d="' + star4(36.5, 19, 2.2) + '"/><circle fill="#fff" cx="36" cy="28.5" r="1"/>'),
-    aether1: crystal(24, 25, 1.35, "#A98CF5", "#CDB8FF") + twinkle(40, 9, 3.2),
-    aether2: crystal(14, 31, 0.8, "#8C6CF0", "#B9A2FA") + crystal(29, 24, 1.15, "#A98CF5", "#CDB8FF") + twinkle(42, 9, 3.2),
-    aether3: crystal(11, 33, 0.72, "#8C6CF0", "#B9A2FA") + crystal(37, 33, 0.72, "#8C6CF0", "#B9A2FA") + crystal(24, 23, 1.15, "#A98CF5", "#CDB8FF") + twinkle(41, 8, 3.2),
-    coins: coin(22, 35) + coin(22, 27.5) + coin(22, 20) + twinkle(40, 10, 3.2),
-    ingot: '<path class="ln" fill="#E9A400" d="M7 37l5-10h24l5 10z"/><path class="ln" fill="#FFD34E" d="M12 27l4-9h16l4 9z"/>'
-      + '<path class="hi" d="M17 20h6l-1.5 3.5h-6z"/>' + twinkle(38, 12, 3.2),
-    vigor: '<rect class="ln" fill="#9A7350" x="19" y="5.5" width="10" height="5" rx="1.5"/>'
-      + '<path class="ln" fill="#6FD69B" d="M19 10.5h10v3.5l5 5V39a3 3 0 0 1-3 3H17a3 3 0 0 1-3-3V19l5-5z"/>'
-      + '<path class="ln" stroke-width="1.8" fill="#FFF3A0" d="M26.5 20l-7 10h4.5l-2 8.5 8-11h-4.6z"/><rect class="hi" x="16.5" y="21" width="2.4" height="13" rx="1.2"/>',
-    glimmer: '<path class="ln" fill="#FFB347" d="' + star4(21, 27, 15, 3.4) + '"/><path class="hi" d="' + star4(17.5, 22.5, 3, 0.8) + '"/>'
-      + '<path class="ln" stroke-width="1.8" fill="#FFD34E" d="' + star4(36.5, 13, 7, 1.8) + '"/><circle class="ln" stroke-width="1.4" fill="#FFD34E" cx="38" cy="35" r="2.6"/>',
+    aether1: "<defs>" + AETHER + "</defs>" + crystal(24, 25, 1.35) + twinkle(40, 9, 3.6),
+    aether2: "<defs>" + AETHER + "</defs>" + crystal(14, 31, 0.8) + crystal(29, 24, 1.15) + twinkle(42, 9, 3.6),
+    aether3: "<defs>" + AETHER + "</defs>" + crystal(11, 33, 0.72) + crystal(37, 33, 0.72) + crystal(24, 23, 1.15) + twinkle(41, 8, 3.6),
+    coins: "<defs>" + GOLD + "</defs>" + coin(22, 35) + coin(22, 27.5) + coin(22, 20) + twinkle(40, 10, 3.6),
+    ingot: "<defs>" + GOLD + "</defs>"
+      + '<path fill="url(#gmm-gs)" stroke="#C98200" stroke-width="1.2" stroke-linejoin="round" d="M7 37l5-10h24l5 10z"/>'
+      + '<path fill="url(#gmm-gt)" stroke="#C98200" stroke-width="1.2" stroke-linejoin="round" d="M12 27l4-9h16l4 9z"/>'
+      + '<path fill="#fff" opacity=".75" d="M17.2 20h6l-1.4 3.4h-6.1z"/>' + twinkle(38, 12, 3.6),
+    vigor: "<defs>" + grad("vg", "#C9F7DA", "#3DBE7A") + "</defs>"
+      + '<rect fill="#C08A5C" stroke="#8A5E3A" stroke-width="1.1" x="19" y="5.5" width="10" height="5" rx="1.5"/>'
+      + '<path fill="url(#gmm-vg)" stroke="#2A9A60" stroke-width="1.3" stroke-linejoin="round" d="M19 10.5h10v3.5l5 5V39a3 3 0 0 1-3 3H17a3 3 0 0 1-3-3V19l5-5z"/>'
+      + '<path fill="#FFF3A0" stroke="#E8A100" stroke-width="1" stroke-linejoin="round" d="M26.5 20l-7 10h4.5l-2 8.5 8-11h-4.6z"/>'
+      + '<rect fill="#fff" opacity=".6" x="16.6" y="20.5" width="2.2" height="14" rx="1.1"/>',
+    glimmer: "<defs>" + grad("gl", "#FFE9A0", "#FF9F2E") + "</defs>"
+      + '<path fill="url(#gmm-gl)" stroke="#E07B12" stroke-width="1.2" stroke-linejoin="round" d="' + star4(21, 27, 15, 3.4) + '"/>'
+      + '<path fill="#fff" opacity=".8" d="' + star4(17.5, 22.5, 3, 0.8) + '"/>'
+      + '<path fill="#FFE27A" stroke="#E0A100" stroke-width="1" stroke-linejoin="round" d="' + star4(36.5, 13, 7, 1.8) + '"/>'
+      + '<circle fill="#FFE27A" stroke="#E0A100" stroke-width="1" cx="38" cy="35" r="2.6"/>',
     pass: '<defs><linearGradient id="gmm-pass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE9A8"/><stop offset="1" stop-color="#FFB347"/></linearGradient></defs>'
-      + '<rect x="7" y="10" width="34" height="31" rx="5" fill="url(#gmm-pass)" stroke="#E08A1E" stroke-width="2.4"/>'
-      + '<path d="M7 18.5h34" stroke="#E08A1E" stroke-width="2"/><path fill="#fff" opacity=".35" d="M10 12.5h28a1.5 1.5 0 0 1 1.5 1.5v3H8.5v-3a1.5 1.5 0 0 1 1.5-1.5z"/>'
-      + '<rect x="14" y="6" width="3.6" height="8" rx="1.8" fill="#fff" stroke="#E08A1E" stroke-width="1.8"/><rect x="30.4" y="6" width="3.6" height="8" rx="1.8" fill="#fff" stroke="#E08A1E" stroke-width="1.8"/>'
-      + '<text x="24" y="36.5" text-anchor="middle" font-family="Jua, sans-serif" font-size="15" font-weight="700" fill="#fff" stroke="#E08A1E" stroke-width="3" paint-order="stroke">7</text>'
+      + '<rect x="7" y="10" width="34" height="31" rx="5" fill="url(#gmm-pass)" stroke="#E08A1E" stroke-width="1.6"/>'
+      + '<path d="M7 18.5h34" stroke="#E08A1E" stroke-width="1.4"/><path fill="#fff" opacity=".35" d="M10 12.5h28a1.5 1.5 0 0 1 1.5 1.5v3H8.5v-3a1.5 1.5 0 0 1 1.5-1.5z"/>'
+      + '<rect x="14" y="6" width="3.6" height="8" rx="1.8" fill="#fff" stroke="#E08A1E" stroke-width="1.3"/><rect x="30.4" y="6" width="3.6" height="8" rx="1.8" fill="#fff" stroke="#E08A1E" stroke-width="1.3"/>'
+      + '<text x="24" y="36.5" text-anchor="middle" font-family="Jua, sans-serif" font-size="15" font-weight="700" fill="#fff" stroke="#E08A1E" stroke-width="2.4" paint-order="stroke">7</text>'
       + '<path fill="#fff" d="' + star4(38, 9, 3.4) + '"/>',
-    gift: '<path class="ln" fill="#FF8FB1" d="M9 22h30v16a3 3 0 0 1-3 3H12a3 3 0 0 1-3-3z"/><rect class="ln" fill="#FFB3C9" x="6" y="15" width="36" height="8" rx="2"/>'
-      + '<path class="ln" fill="#FFE17A" d="M21 15h6v26h-6z"/><path class="ln" fill="#FFE17A" d="M24 15c-3-6-10-7-10-2.5S20 15 24 15zM24 15c3-6 10-7 10-2.5S28 15 24 15z"/>'
-      + '<rect class="hi" x="9" y="17" width="9" height="2.2" rx="1.1"/>',
+    gift: "<defs>" + grad("gf", "#FFC9D8", "#FF6F97") + grad("gfl", "#FFE0E9", "#FF94B2") + GOLD + "</defs>"
+      + '<path fill="url(#gmm-gf)" stroke="#D6336A" stroke-width="1.2" stroke-linejoin="round" d="M9 22h30v16a3 3 0 0 1-3 3H12a3 3 0 0 1-3-3z"/>'
+      + '<rect fill="url(#gmm-gfl)" stroke="#D6336A" stroke-width="1.2" x="6" y="15" width="36" height="8" rx="2"/>'
+      + '<path fill="url(#gmm-gt)" stroke="#D99A00" stroke-width="1" d="M21 15h6v26h-6z"/>'
+      + '<path fill="url(#gmm-gt)" stroke="#D99A00" stroke-width="1" stroke-linejoin="round" d="M24 15c-3-6-10-7-10-2.5S20 15 24 15zM24 15c3-6 10-7 10-2.5S28 15 24 15z"/>'
+      + '<rect fill="#fff" opacity=".6" x="9" y="17" width="9" height="2" rx="1"/>',
   };
   // Each drawing gets its own gradient ids: with shared ids every url(#…) used the first copy in the page, and
   // once that copy sat in a hidden pane (the key items behind 충전소) the tickets lost their colours.
@@ -237,22 +253,25 @@
 .gmm-pass-days span[data-today] { border: 2.5px solid var(--gmm-accent); animation: gmm-ask .6s ease-in-out infinite alternate; }
 .gmm-pass-days span[data-miss] { opacity: .45; text-decoration: line-through; }
 /* Buttons: the game's action button (flat coral, cut corner) or 말랑's glossy pill. */
-.gmm-pass > button, .gmm-pack button { cursor: pointer; font: inherit; white-space: nowrap; --cut: .45em; clip-path: var(--gmm-clip-btn);
+.gmm-pass-act > .gmm-pay, .gmm-pack button { cursor: pointer; font: inherit; white-space: nowrap; --cut: .45em; clip-path: var(--gmm-clip-btn);
   border-radius: var(--gmm-pill); border: var(--gmm-bw2) solid var(--gmm-line); box-shadow: 0 calc(var(--gmm-drop) * .6) 0 var(--gmm-line); }
-:host(:not([data-gfx-style="trickcal"])) :is(.gmm-pass > button, .gmm-pack button) { border-color: transparent; font-weight: 700; letter-spacing: .04em; }
-.gmm-pass > button { font-size: calc(var(--f, 10px) * 1.1); padding: .4em 1.1em; color: var(--gmm-buy-fg); background: var(--gmm-buy-bg); }
-.gmm-pass > button[data-claim]:not(:disabled) { background: var(--gmm-ok-bg); color: #fff; }
-.gmm-pass > button[data-ask] { background: var(--gmm-ask-bg); color: #fff; animation: gmm-ask .5s ease-in-out infinite alternate; }
-.gmm-pass > button:disabled { filter: grayscale(.6); opacity: .7; cursor: default; }
-@container (max-width: 520px) { .gmm-pass { grid-template-columns: auto 1fr; } .gmm-pass > button { grid-column: 1 / -1; } }
+:host(:not([data-gfx-style="trickcal"])) :is(.gmm-pass-act > .gmm-pay, .gmm-pack button) { border-color: transparent; font-weight: 700; letter-spacing: .04em; }
+.gmm-pass-act > .gmm-pay { font-size: calc(var(--f, 10px) * 1.1); padding: .4em 1.1em; color: var(--gmm-buy-fg); background: var(--gmm-buy-bg); }
+.gmm-pass-act > .gmm-pay[data-claim]:not(:disabled) { background: var(--gmm-ok-bg); color: #fff; }
+.gmm-pass-act > .gmm-pay[data-ask] { background: var(--gmm-ask-bg); color: #fff; animation: gmm-ask .5s ease-in-out infinite alternate; }
+.gmm-pass-act > .gmm-pay:disabled { filter: grayscale(.6); opacity: .7; cursor: default; }
+@container (max-width: 520px) { .gmm-pass { grid-template-columns: auto 1fr; } .gmm-pass-act { grid-column: 1 / -1; } }
 .gmm-pane h3 { margin: .4em 0 0; font-weight: 400; font-size: calc(var(--f, 10px) * 1.25); display: flex; align-items: baseline; gap: .5em; flex-wrap: wrap; }
 :host(:not([data-gfx-style="trickcal"])) .gmm-pane h3 { font-weight: 700; padding-bottom: .15em; border-bottom: 1px solid var(--gmm-edge); }
 .gmm-pane h3 small { font-size: .7em; opacity: .7; font-weight: 400; }
 .gmm-tile .art .gmm-ic { display: block; width: 100%; aspect-ratio: 1; }
-/* Drawn icons: outlined in the theme's line colour, a small shadow under them. */
-.gmm-svg { overflow: visible; filter: drop-shadow(0 .08em .04em rgba(0, 0, 0, .18)); }
-.gmm-svg .ln { stroke: var(--gmm-icon-line, #6B4528); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
-.gmm-svg .hi { fill: #fff; opacity: .55; }
+/* Drawn icons: a soft shadow under them. */
+.gmm-svg { overflow: visible; filter: drop-shadow(0 .1em .08em rgba(0, 0, 0, .22)); }
+/* "결제할까요?" can be taken back: a quiet text button under the pay button. */
+.gmm-pack .gmm-cancel, .gmm-pass-act .gmm-cancel { width: auto; margin: 0; padding: .1em .6em; cursor: pointer; font: inherit; font-size: calc(var(--f, 10px) * .85);
+  color: var(--gmm-text); opacity: .75; background: none; border: 0; box-shadow: none; clip-path: none; text-decoration: underline; text-underline-offset: .2em; }
+.gmm-pack .gmm-cancel:hover, .gmm-pass-act .gmm-cancel:hover { opacity: 1; }
+.gmm-pass-act { display: flex; flex-direction: column; align-items: center; gap: .2em; }
 /* Drawings fill their box once styled. */
 .gmm-svg { width: 100%; height: 100%; }
 /* The top bar on the summon screen: tickets for this banner, like the game's own currency chips. */
@@ -345,11 +364,24 @@
     if (!h || !wallet) return;
     try { h._wallet = wallet; h._shopRev = (Number(h._shopRev) || 0) + 1; h._renderBrowser?.(); } catch {}
   }
+  let confirmTimer = 0;
+  function askConfirm(id) {
+    confirming = id;
+    clearTimeout(confirmTimer);
+    confirmTimer = setTimeout(() => { if (confirming === id) { confirming = ""; schedule(); } }, 6000);
+    schedule();
+  }
+  function cancelConfirm() { if (!confirming) return false; confirming = ""; clearTimeout(confirmTimer); schedule(); return true; }
+  const cancelButton = () => {
+    const c = el("button", "gmm-cancel", "취소"); c.type = "button";
+    c.addEventListener("click", (e) => { e.stopPropagation(); cancelConfirm(); });
+    return c;
+  };
   async function buy(pack) {
     if (buying) return;
     // First press asks, the second pays (a dialog box may be blocked inside the game's frame).
-    if (confirming !== pack.id) { confirming = pack.id; schedule(); return; }
-    confirming = ""; buying = pack.id; lastNote = ""; schedule();
+    if (confirming !== pack.id) { askConfirm(pack.id); return; }
+    clearTimeout(confirmTimer); confirming = ""; buying = pack.id; lastNote = ""; schedule();
     // A short "paying" beat, like a real checkout.
     await new Promise((r) => setTimeout(r, 700));
     try {
@@ -367,8 +399,8 @@
   }
   async function passAction(kind) {
     if (buying) return;
-    if (kind === "buy" && confirming !== "pass") { confirming = "pass"; schedule(); return; }
-    confirming = ""; buying = "pass-" + kind; lastNote = ""; schedule();
+    if (kind === "buy" && confirming !== "pass") { askConfirm("pass"); return; }
+    clearTimeout(confirmTimer); confirming = ""; buying = "pass-" + kind; lastNote = ""; schedule();
     if (kind === "buy") await new Promise((r) => setTimeout(r, 700));
     try {
       const data = await gf("/more-money/pass/" + kind, { runId: runId() });
@@ -403,18 +435,20 @@
     body.append(dots);
     let b;
     if (!on) {
-      b = el("button", "", buying === "pass-buy" ? "결제 중…" : confirming === "pass" ? PASS.price + " 결제할까요?" : PASS.price);
+      b = el("button", "gmm-pay", buying === "pass-buy" ? "결제 중…" : confirming === "pass" ? PASS.price + " 결제할까요?" : PASS.price);
       if (confirming === "pass") b.dataset.ask = "";
       b.addEventListener("click", (e) => { e.stopPropagation(); passAction("buy"); });
     } else {
-      b = el("button", "", ps.claimedToday ? "오늘 보상 받음 ✓" : buying === "pass-claim" ? "받는 중…" : "오늘 보상 받기");
+      b = el("button", "gmm-pay", ps.claimedToday ? "오늘 보상 받음 ✓" : buying === "pass-claim" ? "받는 중…" : "오늘 보상 받기");
       b.dataset.claim = "";
       b.disabled = !!ps.claimedToday;
       b.addEventListener("click", (e) => { e.stopPropagation(); passAction("claim"); });
     }
     b.type = "button";
     if (buying || patchMissing) b.disabled = true;
-    card.append(icon("pass"), body, b);
+    const act = el("div", "gmm-pass-act"); act.append(b);
+    if (confirming === "pass" && !buying) act.append(cancelButton());
+    card.append(icon("pass"), body, act);
     return card;
   }
   // Aether for tickets: no "pay?" step, it is the game's own currency (like the shop's glimmer items).
@@ -486,6 +520,7 @@
     const scroll = mine ? mine.scrollTop : 0;
     mine?.remove();
     mine = el("div", "gmm-pane"); mine.dataset.key = key;
+    mine.addEventListener("click", (e) => { if (!e.target.closest("button")) cancelConfirm(); });
     const top = el("div", "gmm-top");
     const leftTag = el("span", "gmm-left"); leftTag.append("오늘 남은 충전 ", el("b", "", left == null ? "?" : String(left)), " / " + DAILY);
     top.append(el("span", "gmm-title", "충전소"), leftTag);
@@ -503,6 +538,7 @@
       b.disabled = !!buying || patchMissing || left === 0;
       b.addEventListener("click", (e) => { e.stopPropagation(); buy(p); });
       card.append(icon(p.icon), el("span", "gmm-nm", p.name), el("span", "gmm-gr", p.grant), el("span", "gmm-nt", p.note), b);
+      if (confirming === p.id && !buying) card.append(cancelButton());
       grid.append(card);
     }
     mine.append(h2, grid, el("div", "gmm-fine", "놀이용 가상 결제예요. 실제 돈은 나가지 않으며, 충전 횟수는 서버 날짜 기준으로 매일 초기화돼요.\n소환권은 상점 [주요 아이템]이나 소환 화면 상단에서 에테르로 교환해요."));
@@ -875,6 +911,7 @@
   }
   const onKey = (e) => {
     if (ask && e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeAsk(); return; }
+    if (confirming && e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancelConfirm(); return; }
     if (!codex) return;
     const v = codex.sheet.querySelector(":scope > .cx-view");
     if (e.key === "Escape") { e.preventDefault(); if (v) v.remove(); else closeCodex(); }
