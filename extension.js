@@ -1,4 +1,4 @@
-/* Gacha More Money v1.1.1 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.1.2 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 반짝이 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -85,8 +85,8 @@
     + '<ellipse fill="none" stroke="#E9A400" stroke-width="1.5" cx="' + x + '" cy="' + y + '" rx="8.5" ry="3"/>';
   const twinkle = (x, y, r) => '<path fill="#FFF6C8" class="ln" stroke-width="1.2" d="' + star4(x, y, r) + '"/>';
   const ICONS = {
-    std: ticket("#5AA8F0", "#2F7FD0", '<path class="ln" stroke-width="1.8" fill="#FFF6C8" d="' + star4(29.5, 22.5, 7) + '"/>' + twinkle(37, 16.5, 2.4)),
-    ltd: ticket("#8A63E8", "#5C3BBF", '<path class="ln" stroke-width="1.8" fill="#FFE59A" d="M32.5 15.6a7.2 7.2 0 1 0 0 13.8a5.8 5.8 0 1 1 0-13.8z"/>' + twinkle(37.5, 18, 2.4)),
+    std: ticket("#4FC3F7", "#1E8FD0", '<path class="ln" stroke-width="1.8" fill="#FFF6C8" d="' + star4(29.5, 22.5, 7) + '"/>' + twinkle(37, 16.5, 2.4)),
+    ltd: ticket("#E0476E", "#A82648", '<path class="ln" stroke-width="1.8" fill="#FFE8A3" d="M32.5 15.6a7.2 7.2 0 1 0 0 13.8a5.8 5.8 0 1 1 0-13.8z"/>' + twinkle(37.5, 18, 2.4)),
     aether1: crystal(24, 25, 1.35, "#A98CF5", "#CDB8FF") + twinkle(40, 9, 3.2),
     aether2: crystal(14, 31, 0.8, "#8C6CF0", "#B9A2FA") + crystal(29, 24, 1.15, "#A98CF5", "#CDB8FF") + twinkle(42, 9, 3.2),
     aether3: crystal(11, 33, 0.72, "#8C6CF0", "#B9A2FA") + crystal(37, 33, 0.72, "#8C6CF0", "#B9A2FA") + crystal(24, 23, 1.15, "#A98CF5", "#CDB8FF") + twinkle(41, 8, 3.2),
