@@ -1,4 +1,4 @@
-/* Gacha More Money v1.6.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.7.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 글리머 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -333,6 +333,19 @@
 .gmm-pane .gmm-msg { padding: .7em 1em; border-radius: var(--gmm-r); background: color-mix(in srgb, var(--gmm-pick) 18%, var(--gmm-card));
   border: 2px dashed var(--gmm-edge); line-height: 1.5; font-size: calc(var(--f, 10px) * .95); white-space: pre-line; }
 :host([data-gfx-style="trickcal"]) .gmm-pane .gmm-msg { background: color-mix(in srgb, var(--gmm-pick) 35%, var(--gmm-card)); }
+.gmm-hist { border-radius: var(--gmm-r); background: var(--gmm-card); border: var(--gmm-bw) solid var(--gmm-line); --cut: .6em; clip-path: var(--gmm-clip); }
+:host([data-gfx-style="trickcal"]) .gmm-hist { box-shadow: 0 calc(var(--gmm-drop) * .6) 0 var(--gmm-line); }
+.gmm-hist summary { cursor: pointer; display: flex; align-items: baseline; gap: .6em; padding: .6em 1em; font-size: calc(var(--f, 10px) * 1.1); list-style: none; }
+.gmm-hist summary::-webkit-details-marker { display: none; }
+.gmm-hist summary::before { content: "▸"; transition: rotate .15s ease; }
+.gmm-hist[open] summary::before { rotate: 90deg; }
+.gmm-hist summary small { font-size: .78em; opacity: .7; }
+.gmm-hist ul { margin: 0; padding: 0 1em .7em; list-style: none; display: flex; flex-direction: column; }
+.gmm-hrow { display: grid; grid-template-columns: 6.5em minmax(6em, auto) 1fr auto; gap: .8em; align-items: baseline; padding: .4em 0; font-size: calc(var(--f, 10px) * .9);
+  border-top: 1px solid color-mix(in srgb, var(--gmm-edge) 60%, transparent); }
+.gmm-hrow .gmm-hwhen { opacity: .65; font-variant-numeric: tabular-nums; }
+.gmm-hrow .gmm-hgot { color: var(--gmm-accent); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gmm-hrow .gmm-hprice { opacity: .85; white-space: nowrap; }
 .gmm-pane .gmm-fine { font-size: calc(var(--f, 10px) * .78); opacity: .7; text-align: center; white-space: pre-line; line-height: 1.5; }
 /* The codex button under the lobby's [✥ 배치] (말랑 UI), or alone on the home screen without it. */
 .gmm-codex-btn { position: absolute; left: 1.6%; top: calc(10.5% + var(--f, 10px) * 2.6); z-index: 500; pointer-events: auto; cursor: pointer;
@@ -384,6 +397,23 @@
     c.addEventListener("click", (e) => { e.stopPropagation(); cancelConfirm(); });
     return c;
   };
+  // Purchases carry a request number. When the answer is lost (a dropped connection) the same number goes once
+  // more, and the server answers with what it already did instead of paying twice.
+  const newRequestId = () => {
+    try { return crypto.randomUUID().replace(/-/g, ""); } catch { return Date.now().toString(36) + Math.random().toString(36).slice(2).padEnd(12, "0"); }
+  };
+  async function pay(path, body) {
+    const req = { ...body, requestId: newRequestId() };
+    let data;
+    try { data = await gf(path, req); }
+    catch (e) {
+      if (e instanceof ApiError) throw e;
+      await new Promise((r) => setTimeout(r, 800));
+      data = await gf(path, req);
+    }
+    if (Array.isArray(data.history)) status = { ...(status || {}), history: data.history };
+    return data;
+  }
   async function buy(pack) {
     if (buying) return;
     // First press asks, the second pays (a dialog box may be blocked inside the game's frame).
@@ -392,9 +422,9 @@
     // A short "paying" beat, like a real checkout.
     await new Promise((r) => setTimeout(r, 700));
     try {
-      const data = await gf("/more-money/topup", { runId: runId(), pack: pack.id });
+      const data = await pay("/more-money/topup", { runId: runId(), pack: pack.id });
       status = { ...(status || {}), ...data };
-      lastNote = "결제 완료! " + pack.grant + "을(를) 받았어요. (오늘 남은 충전 " + data.left + "/" + (data.daily || DAILY) + ")";
+      lastNote = data.replay ? "이미 처리된 결제예요. 아래 결제 내역에서 확인할 수 있어요." : "결제 완료! " + pack.grant + "을(를) 받았어요. (오늘 남은 충전 " + data.left + "/" + (data.daily || DAILY) + ")";
       adoptWallet(data.wallet);
     } catch (e) {
       if (unpatched(e)) patchMissing = true;
@@ -410,7 +440,7 @@
     clearTimeout(confirmTimer); confirming = ""; buying = "pass-" + kind; lastNote = ""; schedule();
     if (kind === "buy") await new Promise((r) => setTimeout(r, 700));
     try {
-      const data = await gf("/more-money/pass/" + kind, { runId: runId() });
+      const data = await pay("/more-money/pass/" + kind, { runId: runId() });
       status = { ...(status || {}), tickets: data.tickets, pass: data.pass };
       lastNote = kind === "buy" ? "주간 패스 시작! " + PASS.buy + "을(를) 받았어요. 오늘부터 " + PASS.days + "일 동안 매일 보상을 받으세요."
         : "주간 패스 " + data.pass.day + "일째 보상: " + PASS.daily + "을(를) 받았어요!";
@@ -423,6 +453,29 @@
     }
     buying = "";
     schedule();
+  }
+  /* The last 20 purchases, newest first (a folded list under the packs). */
+  const CURRENCY = { aether: "에테르", funds: "자금", vigor: "활력", glimmer: "글리머", gmmTicketStd: "성휘", gmmTicketLtd: "월휘" };
+  const grantText = (g) => Object.entries(g || {}).map(([k, q]) => (CURRENCY[k] || k) + " " + fmt(q) + (k.startsWith("gmmTicket") ? "장" : "")).join(" · ");
+  const when = (at) => { const d = new Date(Number(at) || 0), p = (n) => String(n).padStart(2, "0"); return d.getMonth() + 1 + "/" + d.getDate() + " " + p(d.getHours()) + ":" + p(d.getMinutes()); };
+  function receiptRow(r) {
+    const pack = PACKS.find((p) => p.id === r.item), ex = EXCHANGE.find((x) => x.id === r.item);
+    const [label, price] = r.kind === "topup" ? [pack ? pack.name : r.item, pack ? pack.price : ""]
+      : r.kind === "exchange" ? [ex ? TICKETS[ex.ticket].name + " 교환" : "소환권 교환", "✦" + fmt(r.spent)]
+      : r.kind === "pass-buy" ? ["주간 패스", PASS.price] : ["주간 패스 보상", "받음"];
+    const row = el("li", "gmm-hrow"); row.dataset.kind = r.kind;
+    row.append(el("span", "gmm-hwhen", when(r.at)), el("span", "gmm-hname", label), el("span", "gmm-hgot", grantText(r.granted)), el("span", "gmm-hprice", price));
+    return row;
+  }
+  let histOpen = false;
+  function historyBlock() {
+    const list = (status && status.history) || [];
+    const box = el("details", "gmm-hist"); box.open = histOpen;
+    box.addEventListener("toggle", () => { histOpen = box.open; });
+    const sum = el("summary", "", "결제 내역"); sum.append(el("small", "", list.length ? "최근 " + list.length + "건" : "아직 없어요"));
+    box.append(sum);
+    if (list.length) { const ul = el("ul"); ul.append(...list.map(receiptRow)); box.append(ul); }
+    return box;
   }
   function passCard() {
     const ps = status && status.pass, on = !!(ps && ps.active);
@@ -464,7 +517,7 @@
     buying = x.id; schedule();
     const tk = TICKETS[x.ticket];
     try {
-      const data = await gf("/more-money/exchange", { runId: runId(), item: x.id });
+      const data = await pay("/more-money/exchange", { runId: runId(), item: x.id });
       status = { ...(status || {}), tickets: data.tickets };
       lastNote = tk.name + " " + x.qty + "장을 받았어요! (에테르 -" + fmt(x.cost) + ")";
       adoptWallet(data.wallet);
@@ -575,7 +628,7 @@
     pane.classList.toggle("gmm-open", shopOpen);
     let mine = pane.querySelector(":scope > .gmm-pane");
     if (!shopOpen) { mine?.remove(); paintKeyItems(rail, pane); return; }
-    const key = JSON.stringify([left, buying, confirming, patchMissing, lastNote, status && status.tickets, status && status.pass, aether()]);
+    const key = JSON.stringify([left, buying, confirming, patchMissing, lastNote, status && status.tickets, status && status.pass, aether(), status && status.history && status.history.length, status && status.history && status.history[0] && status.history[0].at]);
     if (mine && mine.dataset.key === key) return;
     const scroll = mine ? mine.scrollTop : 0;
     mine?.remove();
@@ -603,7 +656,7 @@
       card.append(icon(p.icon), el("span", "gmm-nm", p.name), gr, el("span", "gmm-nt", p.note), row);
       grid.append(card);
     }
-    mine.append(h2, grid, el("div", "gmm-fine", "놀이용 가상 결제예요. 실제 돈은 나가지 않으며, 충전 횟수는 서버 날짜 기준으로 매일 초기화돼요.\n소환권은 상점 [주요 아이템]이나 소환 화면 상단에서 에테르로 교환해요."));
+    mine.append(h2, grid, historyBlock(), el("div", "gmm-fine", "놀이용 가상 결제예요. 실제 돈은 나가지 않으며, 충전 횟수는 서버 날짜 기준으로 매일 초기화돼요.\n소환권은 상점 [주요 아이템]이나 소환 화면 상단에서 에테르로 교환해요."));
     pane.append(mine);
     mine.scrollTop = scroll;
   }
@@ -738,7 +791,7 @@
   async function buyTickets(t, k) {
     const steps = k === 10 ? [t + "-10"] : Array.from({ length: k }, () => t + "-1");
     for (const item of steps) {
-      const data = await gf("/more-money/exchange", { runId: runId(), item });
+      const data = await pay("/more-money/exchange", { runId: runId(), item });
       status = { ...(status || {}), tickets: data.tickets };
       adoptWallet(data.wallet);
     }
@@ -848,7 +901,7 @@
 
   const TABS = [
     ["enemies", "적", false], ["units", "캐릭터", false], ["outfits", "의상", false],
-    ["story", "배경", true], ["battle", "전투 배경", true], ["cg", "CG", true], ["banner", "배너", true], ["bond", "인연 배경", true],
+    ["story", "배경", true], ["battle", "전투 배경", true], ["cg", "CG", true], ["banner", "배너", true], ["bond", "인연 배경", true], ["photo", "메신저 사진", false],
   ];
   let codex = null;
   // The codex sits outside .gf-arena, so it takes the arena's resolved --gmm-* tokens (the game's current style,
@@ -866,8 +919,8 @@
     }
   }
   async function loadCodex(id) {
-    // enemies / battle stay null when the server patch is missing (the tabs then say so).
-    const out = { enemies: null, units: [], outfits: [], story: [], battle: null, cg: [], banner: [], bond: [], error: "" };
+    // enemies / battle / photo stay null when the server patch is missing (the tabs then say so).
+    const out = { enemies: null, units: [], outfits: [], story: [], battle: null, cg: [], banner: [], bond: [], photo: null, error: "" };
     const [home, extra] = await Promise.allSettled([gf("/home-options", { runId: id }), gf("/more-money/codex", { runId: id })]);
     if (home.status === "fulfilled") {
       const d = home.value, bg = d.backgrounds || {};
@@ -877,6 +930,8 @@
     } else out.error = "캐릭터 · 배경을 불러오지 못했어요 (" + home.reason.message + ").";
     if (extra.status === "fulfilled") {
       out.enemies = extra.value.enemies || []; out.battle = extra.value.battle || [];
+      // Pictures the characters sent in the messenger (the 1.7 patch; an older one leaves the tab asking for it).
+      if (Array.isArray(extra.value.photos)) out.photo = extra.value.photos.filter((x) => x.url);
       // The 1.5 patch lists every unit of the world, pulled or not; an older one leaves these out (owned only then).
       if (Array.isArray(extra.value.units)) out.units = extra.value.units.filter((x) => x.url);
       if (Array.isArray(extra.value.outfits)) out.outfits = extra.value.outfits.filter((x) => x.url).map((x) => ({ ...x, name: x.name + (x.kit ? " · " + x.kit : "") }));
@@ -941,7 +996,7 @@
     c.body.scrollTop = 0;
     c.body.replaceChildren();
     if (d.error) c.body.append(el("div", "cx-empty", d.error));
-    if (list == null) { c.body.append(el("div", "cx-empty", "적 · 전투 배경 그림은 서버 패치가 있어야 볼 수 있어요.\n이 확장 폴더의 patch/apply-patch.mjs를 실행하고 마리나라를 다시 켜 주세요.")); return; }
+    if (list == null) { c.body.append(el("div", "cx-empty", "적 · 전투 배경 · 메신저 사진은 서버 패치가 있어야 볼 수 있어요.\n이 확장 폴더의 patch/apply-patch.mjs를 실행하고 마리나라를 다시 켜 주세요.")); return; }
     if (!list.length) { c.body.append(el("div", "cx-empty", "아직 모은 그림이 없어요.\n게임을 진행하면 그려진 그림이 여기에 모여요.")); return; }
     const grid = el("div", "cx-grid" + (wide ? " wide" : ""));
     const frag = document.createDocumentFragment();
