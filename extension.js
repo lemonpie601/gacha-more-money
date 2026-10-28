@@ -1,6 +1,6 @@
-/* Gacha More Money v1.1.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.1.1 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 반짝이 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
- *  - 소환은 에테르 대신 소환권: 상시 배너는 별의 서약, 한정 배너는 월식의 서약. 소환권은 에테르로 교환합니다.
+ *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
  * The wallet lives in the game's own save, which no browser request can change, so the top-up and the enemy list
  * need the server patch in patch/apply-patch.mjs (POST /api/gacha-forge/more-money/*). Without it the shop shows
@@ -40,22 +40,22 @@
   const cleanups = [];
 
   /* ═════════════ Packs (keep in sync with patch/apply-patch.mjs PACKS / EXCHANGE) ═════════════ */
-  // The two summon tickets: the standard banner takes 별의 서약, the limited (featured) banner 월식의 서약.
+  // The two summon tickets: the standard banner takes 성휘, the limited (featured) banner 월휘.
   const TICKETS = {
-    std: { key: "gmmTicketStd", name: "별의 서약", kind: "상시 소환권", tone: "std" },
-    ltd: { key: "gmmTicketLtd", name: "월식의 서약", kind: "한정 소환권", tone: "ltd" },
+    std: { key: "gmmTicketStd", name: "성휘", kind: "상시 소환권", tone: "std" },
+    ltd: { key: "gmmTicketLtd", name: "월휘", kind: "한정 소환권", tone: "ltd" },
   };
   const PACKS = [
-    { id: "starter", name: "첫걸음 꾸러미", icon: "★", grant: "에테르 1,600 · 자금 50,000 · 월식의 서약 1장", note: "가장 알찬 구성", price: "₩4,400", tone: "gift", best: "추천" },
-    { id: "ticket-ltd", name: "월식의 서약 묶음", icon: "☾", grant: "월식의 서약 10장", note: "한정 배너 10회 소환", price: "₩49,000", tone: "ltd", best: "인기!" },
-    { id: "ticket-std", name: "별의 서약 묶음", icon: "✧", grant: "별의 서약 10장", note: "상시 배너 10회 소환", price: "₩29,000", tone: "std" },
-    { id: "aether-s", name: "에테르 한 줌", icon: "✦", grant: "에테르 1,600", note: "소환권 10장어치", price: "₩33,000", tone: "aether" },
-    { id: "aether-m", name: "에테르 상자", icon: "✦", grant: "에테르 4,800", note: "소환권 30장어치", price: "₩99,000", tone: "aether" },
-    { id: "aether-l", name: "에테르 보물고", icon: "✦", grant: "에테르 9,600", note: "소환권 60장어치", price: "₩199,000", tone: "aether" },
-    { id: "funds-s", name: "자금 자루", icon: "◎", grant: "자금 100,000", note: "레벨업 · 승급용", price: "₩11,000", tone: "funds" },
-    { id: "funds-l", name: "자금 금괴", icon: "◎", grant: "자금 300,000", note: "레벨업 · 승급용", price: "₩29,000", tone: "funds" },
-    { id: "vigor", name: "활력 드링크", icon: "ϟ", grant: "활력 +60", note: "최대치를 넘어 채워져요", price: "₩5,500", tone: "vigor" },
-    { id: "glimmer", name: "반짝이 주머니", icon: "✺", grant: "반짝이 300", note: "상점 물건 구매용", price: "₩8,800", tone: "glimmer" },
+    { id: "starter", name: "첫걸음 꾸러미", icon: "gift", grant: "에테르 1,600 · 자금 50,000 · 월휘 1장", note: "가장 알찬 구성", price: "₩4,400", tone: "gift", best: "추천" },
+    { id: "ticket-ltd", name: "월휘 꾸러미", icon: "ltd", grant: "월휘 10장", note: "한정 배너 10회 소환", price: "₩49,000", tone: "ltd", best: "인기!" },
+    { id: "ticket-std", name: "성휘 꾸러미", icon: "std", grant: "성휘 10장", note: "상시 배너 10회 소환", price: "₩29,000", tone: "std" },
+    { id: "aether-s", name: "에테르 한 줌", icon: "aether1", grant: "에테르 1,600", note: "소환권 10장어치", price: "₩33,000", tone: "aether" },
+    { id: "aether-m", name: "에테르 상자", icon: "aether2", grant: "에테르 4,800", note: "소환권 30장어치", price: "₩99,000", tone: "aether" },
+    { id: "aether-l", name: "에테르 보물고", icon: "aether3", grant: "에테르 9,600", note: "소환권 60장어치", price: "₩199,000", tone: "aether" },
+    { id: "funds-s", name: "자금 자루", icon: "coins", grant: "자금 100,000", note: "레벨업 · 승급용", price: "₩11,000", tone: "funds" },
+    { id: "funds-l", name: "자금 금괴", icon: "ingot", grant: "자금 300,000", note: "레벨업 · 승급용", price: "₩29,000", tone: "funds" },
+    { id: "vigor", name: "활력 드링크", icon: "vigor", grant: "활력 +60", note: "최대치를 넘어 채워져요", price: "₩5,500", tone: "vigor" },
+    { id: "glimmer", name: "반짝이 주머니", icon: "glimmer", grant: "반짝이 300", note: "상점 물건 구매용", price: "₩8,800", tone: "glimmer" },
   ];
   const DAILY = 3;
   // Tickets for aether, as often as you like: one summon still costs what it did (160 aether).
@@ -63,6 +63,50 @@
     { id: "std-1", ticket: "std", qty: 1, cost: 160 }, { id: "std-10", ticket: "std", qty: 10, cost: 1600 },
     { id: "ltd-1", ticket: "ltd", qty: 1, cost: 160 }, { id: "ltd-10", ticket: "ltd", qty: 10, cost: 1600 },
   ];
+
+  /* ═════════════ Icons ═════════════
+   * Small drawings in a 48×48 box, outlined in the theme's line colour (class "ln") with a white shine ("hi"). */
+  const star4 = (x, y, r, w = r * 0.28) => `M${x} ${y - r}Q${x + w} ${y - w} ${x + r} ${y}Q${x + w} ${y + w} ${x} ${y + r}Q${x - w} ${y + w} ${x - r} ${y}Q${x - w} ${y - w} ${x} ${y - r}Z`;
+  const ticket = (body, deep, emblem) => '<g transform="rotate(-10 24 24)">'
+    + '<path class="ln" fill="' + body + '" d="M8 13h32a3 3 0 0 1 3 3v4.6a3.4 3.4 0 0 0 0 6.8V32a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-4.6a3.4 3.4 0 0 0 0-6.8V16a3 3 0 0 1 3-3z"/>'
+    + '<path fill="' + deep + '" d="M8 30.5h32a1.5 1.5 0 0 1 1.5 1.5v.2a1.3 1.3 0 0 1-1.3 1.3H7.8a1.3 1.3 0 0 1-1.3-1.3V32A1.5 1.5 0 0 1 8 30.5z"/>'
+    + '<rect class="hi" x="9" y="15.5" width="20" height="2.6" rx="1.3"/>'
+    + '<path d="M16 17v13" stroke="' + deep + '" stroke-width="1.8" stroke-dasharray="2 2.4" stroke-linecap="round"/>'
+    + emblem + '</g>';
+  const crystal = (cx, cy, s, fill, face) => {
+    const p = (x, y) => (cx + x * s).toFixed(1) + " " + (cy + y * s).toFixed(1);
+    return '<path class="ln" fill="' + fill + '" d="M' + p(-6, -12) + "L" + p(6, -12) + "L" + p(12, -4) + "L" + p(0, 13) + "L" + p(-12, -4) + 'Z"/>'
+      + '<path fill="' + face + '" d="M' + p(-3, -4) + "L" + p(3, -4) + "L" + p(0, 13) + 'Z"/>'
+      + '<path class="ln" fill="none" stroke-width="1.6" d="M' + p(-12, -4) + "L" + p(12, -4) + "M" + p(-6, -12) + "L" + p(-3, -4) + "L" + p(0, 13) + "M" + p(6, -12) + "L" + p(3, -4) + '"/>'
+      + '<path class="hi" d="M' + p(-4.6, -10.4) + "L" + p(-1.2, -10.4) + "L" + p(-2.6, -5.6) + "L" + p(-8.6, -5.6) + 'Z"/>';
+  };
+  const coin = (x, y) => '<path class="ln" fill="#E9A400" d="M' + (x - 14) + " " + y + 'v5a14 5.4 0 0 0 28 0v-5"/>'
+    + '<ellipse class="ln" fill="#FFD34E" cx="' + x + '" cy="' + y + '" rx="14" ry="5.4"/>'
+    + '<ellipse fill="none" stroke="#E9A400" stroke-width="1.5" cx="' + x + '" cy="' + y + '" rx="8.5" ry="3"/>';
+  const twinkle = (x, y, r) => '<path fill="#FFF6C8" class="ln" stroke-width="1.2" d="' + star4(x, y, r) + '"/>';
+  const ICONS = {
+    std: ticket("#5AA8F0", "#2F7FD0", '<path class="ln" stroke-width="1.8" fill="#FFF6C8" d="' + star4(29.5, 22.5, 7) + '"/>' + twinkle(37, 16.5, 2.4)),
+    ltd: ticket("#8A63E8", "#5C3BBF", '<path class="ln" stroke-width="1.8" fill="#FFE59A" d="M32.5 15.6a7.2 7.2 0 1 0 0 13.8a5.8 5.8 0 1 1 0-13.8z"/>' + twinkle(37.5, 18, 2.4)),
+    aether1: crystal(24, 25, 1.35, "#A98CF5", "#CDB8FF") + twinkle(40, 9, 3.2),
+    aether2: crystal(14, 31, 0.8, "#8C6CF0", "#B9A2FA") + crystal(29, 24, 1.15, "#A98CF5", "#CDB8FF") + twinkle(42, 9, 3.2),
+    aether3: crystal(11, 33, 0.72, "#8C6CF0", "#B9A2FA") + crystal(37, 33, 0.72, "#8C6CF0", "#B9A2FA") + crystal(24, 23, 1.15, "#A98CF5", "#CDB8FF") + twinkle(41, 8, 3.2),
+    coins: coin(22, 35) + coin(22, 27.5) + coin(22, 20) + twinkle(40, 10, 3.2),
+    ingot: '<path class="ln" fill="#E9A400" d="M7 37l5-10h24l5 10z"/><path class="ln" fill="#FFD34E" d="M12 27l4-9h16l4 9z"/>'
+      + '<path class="hi" d="M17 20h6l-1.5 3.5h-6z"/>' + twinkle(38, 12, 3.2),
+    vigor: '<rect class="ln" fill="#9A7350" x="19" y="5.5" width="10" height="5" rx="1.5"/>'
+      + '<path class="ln" fill="#6FD69B" d="M19 10.5h10v3.5l5 5V39a3 3 0 0 1-3 3H17a3 3 0 0 1-3-3V19l5-5z"/>'
+      + '<path class="ln" stroke-width="1.8" fill="#FFF3A0" d="M26.5 20l-7 10h4.5l-2 8.5 8-11h-4.6z"/><rect class="hi" x="16.5" y="21" width="2.4" height="13" rx="1.2"/>',
+    glimmer: '<path class="ln" fill="#FFB347" d="' + star4(21, 27, 15, 3.4) + '"/><path class="hi" d="' + star4(17.5, 22.5, 3, 0.8) + '"/>'
+      + '<path class="ln" stroke-width="1.8" fill="#FFD34E" d="' + star4(36.5, 13, 7, 1.8) + '"/><circle class="ln" stroke-width="1.4" fill="#FFD34E" cx="38" cy="35" r="2.6"/>',
+    gift: '<path class="ln" fill="#FF8FB1" d="M9 22h30v16a3 3 0 0 1-3 3H12a3 3 0 0 1-3-3z"/><rect class="ln" fill="#FFB3C9" x="6" y="15" width="36" height="8" rx="2"/>'
+      + '<path class="ln" fill="#FFE17A" d="M21 15h6v26h-6z"/><path class="ln" fill="#FFE17A" d="M24 15c-3-6-10-7-10-2.5S20 15 24 15zM24 15c3-6 10-7 10-2.5S28 15 24 15z"/>'
+      + '<rect class="hi" x="9" y="17" width="9" height="2.2" rx="1.1"/>',
+  };
+  function icon(kind) {
+    const n = el("span", "gmm-ic");
+    n.innerHTML = '<svg class="gmm-svg" viewBox="0 0 48 48" width="100%" height="100%" aria-hidden="true">' + (ICONS[kind] || "") + "</svg>";
+    return n;
+  }
 
   /* ═════════════ Styles inside the game (the shop) ═════════════ */
   const GAME_CSS = `
@@ -81,24 +125,18 @@
   background: var(--gfx-card, #FFFDF5); border: 3px solid var(--gfx-line, #6B4528); box-shadow: 0 .3em 0 var(--gfx-line, #6B4528); text-align: center; }
 .gmm-pack[data-best]::before { content: attr(data-best); position: absolute; top: -.75em; right: .8em; padding: .05em .7em; border-radius: 999px; background: #FF6F91; color: #fff;
   border: 2px solid var(--gfx-line, #6B4528); font-size: calc(var(--f, 10px) * .85); rotate: 6deg; }
-.gmm-pack .gmm-ic { display: grid; place-items: center; width: 2.6em; height: 2.6em; border-radius: 50%; font-size: calc(var(--f, 10px) * 2); color: #fff;
-  border: 3px solid var(--gfx-line, #6B4528); box-shadow: 0 .14em 0 var(--gfx-line, #6B4528), inset 0 -.25em 0 rgba(0,0,0,.12); }
-.gmm-pack[data-tone="aether"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #D9C8FF, #8C6CF0); }
-.gmm-pack[data-tone="funds"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #FFE9A8, #F2B600); }
-.gmm-pack[data-tone="std"] .gmm-ic, .gmm-tix [data-tone="std"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #CDEBFF, #3E8EDB); }
-.gmm-pack[data-tone="ltd"] .gmm-ic, .gmm-tix [data-tone="ltd"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #FFC9DA, #B0306A); }
-.gmm-pack[data-tone="vigor"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #C9F5D2, #2FA97C); }
-.gmm-pack[data-tone="glimmer"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #FFE1C9, #F2884B); }
-.gmm-pack[data-tone="gift"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #FFF1C9, #FF8FB1); }
+.gmm-pack .gmm-ic { display: block; width: calc(var(--f, 10px) * 5.2); height: calc(var(--f, 10px) * 5.2); }
 .gmm-pane h3 { margin: .4em 0 0; font-weight: 400; font-size: calc(var(--f, 10px) * 1.25); display: flex; align-items: baseline; gap: .5em; flex-wrap: wrap; }
 .gmm-pane h3 small { font-size: .7em; opacity: .7; }
 .gmm-pane .gmm-xgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--f, 10px) * 20), 1fr)); gap: .8em; }
 .gmm-x { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5em .6em; padding: .55em .8em; border-radius: 18px;
   background: var(--gfx-card, #FFFDF5); border: 3px solid var(--gfx-line, #6B4528); box-shadow: 0 .24em 0 var(--gfx-line, #6B4528); }
-.gmm-x .gmm-ic, .gmm-tix .gmm-ic { display: grid; place-items: center; width: 2em; height: 2em; border-radius: 50%; color: #fff; font-size: calc(var(--f, 10px) * 1.4);
-  border: 2.5px solid var(--gfx-line, #6B4528); box-shadow: 0 .1em 0 var(--gfx-line, #6B4528); }
-.gmm-x[data-tone="std"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #CDEBFF, #3E8EDB); }
-.gmm-x[data-tone="ltd"] .gmm-ic { background: radial-gradient(circle at 35% 30%, #FFC9DA, #B0306A); }
+.gmm-x .gmm-ic { display: block; width: calc(var(--f, 10px) * 3.4); height: calc(var(--f, 10px) * 3.4); }
+.gmm-tix .gmm-ic { display: block; width: 2.2em; height: 2.2em; margin: -.35em 0; }
+/* Drawn icons: outlined like the rest of 말랑 UI, a sticker shadow under them. */
+.gmm-svg { overflow: visible; filter: drop-shadow(0 .1em 0 color-mix(in srgb, var(--gfx-line, #6B4528) 45%, transparent)); }
+.gmm-svg .ln { stroke: var(--gfx-line, #6B4528); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+.gmm-svg .hi { fill: #fff; opacity: .55; }
 .gmm-x .gmm-nm { display: flex; flex-direction: column; line-height: 1.25; white-space: nowrap; min-width: 0; font-size: calc(var(--f, 10px) * 1.1); }
 .gmm-x .gmm-nm small { font-size: .78em; opacity: .7; }
 .gmm-x .gmm-have { font-size: calc(var(--f, 10px) * .9); opacity: .85; white-space: nowrap; }
@@ -208,7 +246,7 @@
       b.addEventListener("click", (e) => { e.stopPropagation(); exchange(x); });
       buys.append(b);
     }
-    row.append(el("span", "gmm-ic", t === "std" ? "✧" : "☾"), nm, el("span", "gmm-have", have == null ? "" : "보유 " + fmt(have) + "장"), buys);
+    row.append(icon(t), nm, el("span", "gmm-have", have == null ? "" : "보유 " + fmt(have) + "장"), buys);
     return row;
   }
   function paintShop(root) {
@@ -249,7 +287,7 @@
     mine.append(top);
     if (patchMissing) mine.append(el("div", "gmm-msg", "충전하려면 서버 패치가 필요해요.\n마리나라를 끄고, 이 확장 폴더의 patch/apply-patch.mjs를 실행한 뒤 다시 켜 주세요.\n(자세한 방법은 README 참고)"));
     if (lastNote) mine.append(el("div", "gmm-msg", lastNote));
-    const h1 = el("h3", "", "소환권 교환"); h1.append(el("small", "", "에테르로 사요 · 상시 배너는 별의 서약, 한정 배너는 월식의 서약으로만 소환할 수 있어요"));
+    const h1 = el("h3", "", "소환권 교환"); h1.append(el("small", "", "에테르로 사요 · 상시 배너는 성휘, 한정 배너는 월휘으로만 소환할 수 있어요"));
     const xgrid = el("div", "gmm-xgrid"); xgrid.append(exchangeRow("std"), exchangeRow("ltd"));
     const h2 = el("h3", "", "오늘의 충전"); h2.append(el("small", "", "모든 상품을 합쳐 하루 " + DAILY + "번"));
     const grid = el("div", "gmm-grid");
@@ -259,7 +297,7 @@
       if (confirming === p.id) b.dataset.ask = "";
       b.disabled = !!buying || patchMissing || left === 0;
       b.addEventListener("click", (e) => { e.stopPropagation(); buy(p); });
-      card.append(el("span", "gmm-ic", p.icon), el("span", "gmm-nm", p.name), el("span", "gmm-gr", p.grant), el("span", "gmm-nt", p.note), b);
+      card.append(icon(p.icon), el("span", "gmm-nm", p.name), el("span", "gmm-gr", p.grant), el("span", "gmm-nt", p.note), b);
       grid.append(card);
     }
     mine.append(h1, xgrid, h2, grid, el("div", "gmm-fine", "놀이용 가상 결제예요. 실제 돈은 나가지 않으며, 충전 횟수는 서버 날짜 기준으로 매일 초기화돼요."));
@@ -268,7 +306,7 @@
   }
 
   /* ═════════════ Summon: tickets instead of aether ═════════════
-   * With the patch the server takes 별의 서약 (standard banners) or 월식의 서약 (limited banners) for each pull.
+   * With the patch the server takes 성휘 (standard banners) or 월휘 (limited banners) for each pull.
    * The game still draws its aether price and greys its buttons by aether; here the price reads in tickets and
    * the buttons follow the tickets held (the game reads aria-disabled when pressed). */
   let summonSeen = false;
@@ -298,7 +336,7 @@
     tix?.remove();
     tix = el("div", "gmm-tix"); tix.dataset.key = key;
     const hold = el("span", "gmm-hold"); hold.dataset.tone = tk.tone;
-    hold.append(el("span", "gmm-ic", t === "std" ? "✧" : "☾"), tk.name + " ", el("b", "", fmt(have)), "장");
+    hold.append(icon(t), tk.name + " ", el("b", "", fmt(have)), "장");
     tix.append(hold);
     const a = aether();
     for (const x of EXCHANGE.filter((x) => x.ticket === t)) {
