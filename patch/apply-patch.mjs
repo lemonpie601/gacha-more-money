@@ -5,7 +5,7 @@
  *   POST /api/gacha-forge/more-money/status  오늘 남은 충전 횟수
  *   POST /api/gacha-forge/more-money/topup     충전(하루 3번): 에테르 · 자금 · 활력 · 반짝이 · 소환권을 지갑에 넣음
  *   POST /api/gacha-forge/more-money/exchange  에테르로 소환권 사기
- *   POST /api/gacha-forge/more-money/codex     도감용 적 이미지 · 전투 배경 목록
+ *   POST /api/gacha-forge/more-money/codex     도감용 적 이미지 · 전투 배경 · 세계의 모든 캐릭터 · 의상(미획득 포함) 목록
  *   POST /api/gacha-forge/more-money/pass/buy    주간 패스 구매(7일): 바로 받는 보상
  *   POST /api/gacha-forge/more-money/pass/claim  주간 패스 오늘 보상(하루 한 번, 7일 동안)
  * 그리고 소환이 에테르 대신 소환권을 씁니다: 상시 배너는 「성휘」(상시 소환권), 한정 배너는 「월휘」(한정 소환권).
@@ -90,6 +90,11 @@ function inject(src) {
   const [, writeRun] = need(/await (\w+)\(\w+,\w+,\w+\)\?\{ok:!0/, seg, "저장");
   const [, pub] = need(/wallet:(\w+)\(\w+,\w+\)\}/, seg, "지갑 응답");
   const [, store, pkg] = need(/await (\w+)\.getById\((\w+)\.id,\w+\(\w+\)\),\w+=\w+&&\w+\.data\|\|\{\};return\{enemies:/, src, "전투 이미지 저장소");
+  // The lobby's own character list (/home-options): where the world's units live and how a unit lists its outfits.
+  // The codex reads the same list without the "owned" filter, so units not pulled yet show too.
+  const home = need(/\.post\("\/home-options",async \w+=>\{[\s\S]{0,400}?await (\w+)\.list\((\w+)\.id,(\w+)\)/, src, "캐릭터 목록");
+  const [, unitStore, unitPkg, unitKind] = home;
+  const [, outfitsOf] = need(/for\(let \w+ of (\w+)\(\w+\)\)\w+\(\w+\.url\)&&\w+\.push\(\{key:\w+\.id,unitId/, src.slice(home.index, home.index + 2000), "의상 목록");
   // The summon: which pool (standard / featured) and where it takes the aether.
   const summon = need(/\w+\.post\("\/summon",async \w+=>\{/, src, "소환 처리");
   const sseg = src.slice(summon.index, summon.index + 3000);
@@ -129,7 +134,12 @@ function inject(src) {
     + `if(!P.active)return{ok:!1,error:"pass-inactive",pass:P};if(P.claimedToday)return{ok:!1,error:"pass-claimed",pass:P};__gmmGive(M,__gmmPassDef.daily);`
     + `S.moreMoneyPass={...S.moreMoneyPass,claimed:[...(S.moreMoneyPass.claimed||[]),__gmmDayNum()]};S.wallet=M;`
     + `return await ${writeRun}(o,b,S)?{ok:!0,granted:__gmmPassDef.daily,wallet:${pub}(M,S),tickets:__gmmTickets(M),pass:__gmmPass(S)}:{ok:!1,error:"write-conflict"}}),`
-    + `${router}.post("/more-money/codex",async p=>{${check}let c=await ${store}.getById(${pkg}.id,o+":combat-art"),d=c&&c.data||{};return{ok:!0,enemies:${list("d.enemies")},battle:${list("d.modes")}}}),`
+    + `${router}.post("/more-money/codex",async p=>{${check}let c=await ${store}.getById(${pkg}.id,o+":combat-art"),d=c&&c.data||{},{data:S}=await ${readRun}(o),R=S&&S.roster||{},W=o+":unit:",U=[],F=[];`
+    + `for(let M of await ${unitStore}.list(${unitPkg}.id,${unitKind})){if(!M||typeof M.id!="string"||!M.id.startsWith(W))continue;let _=M.data;if(!_||_.kind!=="character")continue;`
+    + `let own=!!(_.isProtagonist||R[M.id]),rar=Number(_.rarity)||0,nm=${str}(_.name);${str}(_.portrait)&&U.push({id:M.id,key:M.id,name:nm,url:${str}(_.portrait),rarity:rar,kit:[${str}(_.affinity),${str}(_.role)].filter(Boolean).join(" "),owned:own});`
+    + `for(let x of ${outfitsOf}(_))${str}(x.url)&&F.push({key:x.id,unitId:M.id,name:nm,url:${str}(x.url),rarity:rar,kit:${str}(x.name),owned:own})}`
+    + `let srt=(a,b)=>b.rarity-a.rarity||(a.name<b.name?-1:1);U.sort(srt);F.sort(srt);`
+    + `return{ok:!0,enemies:${list("d.enemies")},battle:${list("d.modes")},units:U,outfits:F}}),`
     + END;
   const payAt = summon.index + pay.index;
   let out = src.slice(0, payAt) + swapped + src.slice(payAt + payText.length);

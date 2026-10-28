@@ -1,4 +1,4 @@
-/* Gacha More Money v1.4.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.5.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 반짝이 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -150,7 +150,6 @@
   --gmm-icon-line: var(--ink, #0E1420);
   --gmm-buy-bg: var(--coral, #F2603C);
   --gmm-buy-fg: var(--on-coral, #FFFFFF);
-  --gmm-x-bg: var(--epic, #9B6FD4);
   --gmm-ok-bg: var(--jade, #2E9E7B);
   --gmm-ask-bg: var(--alarm, #E0334B);
   --gmm-bw: 1px;
@@ -181,7 +180,6 @@
   --gmm-icon-line: var(--gfx-line, #6B4528);
   --gmm-buy-bg: linear-gradient(180deg, #FFE27A, #FFC93C);
   --gmm-buy-fg: #5A3A10;
-  --gmm-x-bg: linear-gradient(180deg, #A98CF5, #7B5BE0);
   --gmm-ok-bg: linear-gradient(180deg, #8EE6A0, #3DA95A);
   --gmm-ask-bg: linear-gradient(180deg, #FF9BB5, #FF6F91);
   --gmm-bw: 3px;
@@ -208,9 +206,9 @@
 .gmm-pane .gmm-left b { color: var(--gmm-accent); }
 .gmm-pane .gmm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--f, 10px) * 15), 1fr)); gap: .9em; }
 /* Cards: a game tile (dark, thin rule, coloured top edge, cut corner) or a 말랑 sticker. */
-.gmm-pack, .gmm-pass, .gmm-x { --cut: .7em; clip-path: var(--gmm-clip); color: var(--gmm-text); background: var(--gmm-card); backdrop-filter: var(--gmm-blur);
+.gmm-pack, .gmm-pass { --cut: .7em; clip-path: var(--gmm-clip); color: var(--gmm-text); background: var(--gmm-card); backdrop-filter: var(--gmm-blur);
   border: var(--gmm-bw) solid var(--gmm-line); border-top: max(var(--gmm-bw), 2px) solid var(--gmm-edge); }
-:host([data-gfx-style="trickcal"]) :is(.gmm-pack, .gmm-pass, .gmm-x) { border-top-width: var(--gmm-bw); }
+:host([data-gfx-style="trickcal"]) :is(.gmm-pack, .gmm-pass) { border-top-width: var(--gmm-bw); }
 .gmm-pack[data-tone="ltd"], .gmm-pack[data-tone="gift"] { border-top-color: var(--gmm-accent); }
 .gmm-pack[data-tone="std"] { border-top-color: var(--water, var(--gmm-edge)); }
 .gmm-pack[data-tone="aether"] { border-top-color: var(--epic, var(--gmm-edge)); }
@@ -239,9 +237,9 @@
 .gmm-pass-days span[data-today] { border: 2.5px solid var(--gmm-accent); animation: gmm-ask .6s ease-in-out infinite alternate; }
 .gmm-pass-days span[data-miss] { opacity: .45; text-decoration: line-through; }
 /* Buttons: the game's action button (flat coral, cut corner) or 말랑's glossy pill. */
-.gmm-pass > button, .gmm-pack button, .gmm-x button { cursor: pointer; font: inherit; white-space: nowrap; --cut: .45em; clip-path: var(--gmm-clip-btn);
+.gmm-pass > button, .gmm-pack button { cursor: pointer; font: inherit; white-space: nowrap; --cut: .45em; clip-path: var(--gmm-clip-btn);
   border-radius: var(--gmm-pill); border: var(--gmm-bw2) solid var(--gmm-line); box-shadow: 0 calc(var(--gmm-drop) * .6) 0 var(--gmm-line); }
-:host(:not([data-gfx-style="trickcal"])) :is(.gmm-pass > button, .gmm-pack button, .gmm-x button) { border-color: transparent; font-weight: 700; letter-spacing: .04em; }
+:host(:not([data-gfx-style="trickcal"])) :is(.gmm-pass > button, .gmm-pack button) { border-color: transparent; font-weight: 700; letter-spacing: .04em; }
 .gmm-pass > button { font-size: calc(var(--f, 10px) * 1.1); padding: .4em 1.1em; color: var(--gmm-buy-fg); background: var(--gmm-buy-bg); }
 .gmm-pass > button[data-claim]:not(:disabled) { background: var(--gmm-ok-bg); color: #fff; }
 .gmm-pass > button[data-ask] { background: var(--gmm-ask-bg); color: #fff; animation: gmm-ask .5s ease-in-out infinite alternate; }
@@ -250,25 +248,11 @@
 .gmm-pane h3 { margin: .4em 0 0; font-weight: 400; font-size: calc(var(--f, 10px) * 1.25); display: flex; align-items: baseline; gap: .5em; flex-wrap: wrap; }
 :host(:not([data-gfx-style="trickcal"])) .gmm-pane h3 { font-weight: 700; padding-bottom: .15em; border-bottom: 1px solid var(--gmm-edge); }
 .gmm-pane h3 small { font-size: .7em; opacity: .7; font-weight: 400; }
-.gmm-pane .gmm-xgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--f, 10px) * 20), 1fr)); gap: .8em; }
-.gmm-x { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5em .6em; padding: .55em .8em; border-radius: var(--gmm-r);
-  box-shadow: 0 calc(var(--gmm-drop) * .8) 0 var(--gmm-line), var(--gmm-shadow); }
-.gmm-x[data-tone="std"] { border-top-color: var(--water, var(--gmm-edge)); }
-.gmm-x[data-tone="ltd"] { border-top-color: var(--gmm-accent); }
-:host([data-gfx-style="trickcal"]) .gmm-x { border-color: var(--gmm-line); }
-.gmm-x .gmm-ic { display: block; width: calc(var(--f, 10px) * 3.4); height: calc(var(--f, 10px) * 3.4); }
 .gmm-tile .art .gmm-ic { display: block; width: 100%; aspect-ratio: 1; }
 /* Drawn icons: outlined in the theme's line colour, a small shadow under them. */
 .gmm-svg { overflow: visible; filter: drop-shadow(0 .08em .04em rgba(0, 0, 0, .18)); }
 .gmm-svg .ln { stroke: var(--gmm-icon-line, #6B4528); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
 .gmm-svg .hi { fill: #fff; opacity: .55; }
-.gmm-x .gmm-nm { display: flex; flex-direction: column; line-height: 1.25; white-space: nowrap; min-width: 0; font-size: calc(var(--f, 10px) * 1.1); }
-.gmm-x .gmm-nm small { font-size: .78em; opacity: .7; }
-.gmm-x .gmm-have { font-size: calc(var(--f, 10px) * .9); opacity: .85; white-space: nowrap; }
-.gmm-x .gmm-buys { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: .4em; }
-.gmm-x button { padding: .25em .7em; color: #fff; background: var(--gmm-x-bg); }
-.gmm-x button:active:not(:disabled):active:not(:disabled) { translate: 0 .12em; box-shadow: 0 calc(var(--gmm-drop) * .13) 0 var(--gmm-line); }
-.gmm-x button:disabled:disabled { filter: grayscale(.8); opacity: .6; cursor: default; }
 /* Drawings fill their box once styled. */
 .gmm-svg { width: 100%; height: 100%; }
 /* The top bar on the summon screen: tickets for this banner, like the game's own currency chips. */
@@ -323,7 +307,7 @@
 .gmm-pane .gmm-msg { padding: .7em 1em; border-radius: var(--gmm-r); background: color-mix(in srgb, var(--gmm-pick) 18%, var(--gmm-card));
   border: 2px dashed var(--gmm-edge); line-height: 1.5; font-size: calc(var(--f, 10px) * .95); white-space: pre-line; }
 :host([data-gfx-style="trickcal"]) .gmm-pane .gmm-msg { background: color-mix(in srgb, var(--gmm-pick) 35%, var(--gmm-card)); }
-.gmm-pane .gmm-fine { font-size: calc(var(--f, 10px) * .78); opacity: .7; text-align: center; }
+.gmm-pane .gmm-fine { font-size: calc(var(--f, 10px) * .78); opacity: .7; text-align: center; white-space: pre-line; line-height: 1.5; }
 /* The codex button under the lobby's [✥ 배치] (말랑 UI), or alone on the home screen without it. */
 .gmm-codex-btn { position: absolute; left: 1.6%; top: calc(10.5% + var(--f, 10px) * 2.6); z-index: 500; pointer-events: auto; cursor: pointer;
   display: inline-flex; align-items: center; gap: .3em; font-family: var(--gmm-font); font-size: calc(var(--f, 10px) * .95); padding: .3em .9em;
@@ -450,19 +434,19 @@
     buying = "";
     schedule();
   }
-  function exchangeRow(t) {
-    const tk = TICKETS[t], have = held(t), a = aether();
-    const row = el("div", "gmm-x"); row.dataset.tone = tk.tone;
-    const nm = el("span", "gmm-nm"); nm.append(tk.name, el("small", "", tk.kind));
-    const buys = el("span", "gmm-buys");
-    for (const x of EXCHANGE.filter((x) => x.ticket === t)) {
-      const b = el("button", "", buying === x.id ? "교환 중…" : "+" + x.qty + " · ✦" + fmt(x.cost)); b.type = "button";
-      b.disabled = !!buying || patchMissing || (a != null && a < x.cost);
-      b.addEventListener("click", (e) => { e.stopPropagation(); exchange(x); });
-      buys.append(b);
-    }
-    row.append(icon(t), nm, el("span", "gmm-have", have == null ? "" : "보유 " + fmt(have) + "장"), buys);
-    return row;
+  // The game counts "on sale / all" under [주요 아이템]; the four ticket tiles count too. The game's own text is
+  // remembered (a fresh draw replaces ours) and both figures raised by the tiles shown.
+  function paintKeyCount(rail) {
+    const n = rail.querySelector(':scope > .sh-cat[data-shop-cat="key"] .sh-cat-n');
+    if (!n) return;
+    // Compared by its figures, not its words: a translation extension may reword "7 of 9" to "7 / 9" after us.
+    const nums = (t) => { const m = /(\d+)\D+(\d+)/.exec(t); return m ? m[1] + "," + m[2] : ""; };
+    const cur = n.textContent;
+    if (!n.dataset.gmmBase || nums(cur) !== n.dataset.gmmShown) n.dataset.gmmBase = cur;
+    const base = n.dataset.gmmBase, m = /(\d+)(\D+)(\d+)/.exec(base), add = patchMissing || !status ? 0 : EXCHANGE.length;
+    const text = m && add ? base.replace(m[0], Number(m[1]) + add + m[2] + (Number(m[3]) + add)) : base;
+    n.dataset.gmmShown = nums(text);
+    if (cur !== text && nums(cur) !== nums(text)) n.textContent = text;
   }
   function paintShop(root) {
     const screen = root.querySelector('[data-screen="shop"]');
@@ -493,6 +477,7 @@
       if (shopOpen && other.classList.contains("on")) { other.classList.remove("on"); other.dataset.gmmWasOn = "1"; }
       else if (!shopOpen && other.dataset.gmmWasOn) { delete other.dataset.gmmWasOn; other.classList.add("on"); }
     }
+    paintKeyCount(rail);
     pane.classList.toggle("gmm-open", shopOpen);
     let mine = pane.querySelector(":scope > .gmm-pane");
     if (!shopOpen) { mine?.remove(); paintKeyItems(rail, pane); return; }
@@ -509,8 +494,6 @@
     if (lastNote) mine.append(el("div", "gmm-msg", lastNote));
     const h0 = el("h3", "", "주간 패스"); h0.append(el("small", "", "하루 " + DAILY + "번 충전과 따로 세요 · 끝나면 다시 살 수 있어요"));
     mine.append(h0, passCard());
-    const h1 = el("h3", "", "소환권 교환"); h1.append(el("small", "", "에테르로 사요 · 상시 배너는 성휘, 한정 배너는 월휘으로만 소환할 수 있어요"));
-    const xgrid = el("div", "gmm-xgrid"); xgrid.append(exchangeRow("std"), exchangeRow("ltd"));
     const h2 = el("h3", "", "오늘의 충전"); h2.append(el("small", "", "모든 상품을 합쳐 하루 " + DAILY + "번"));
     const grid = el("div", "gmm-grid");
     for (const p of PACKS) {
@@ -522,7 +505,7 @@
       card.append(icon(p.icon), el("span", "gmm-nm", p.name), el("span", "gmm-gr", p.grant), el("span", "gmm-nt", p.note), b);
       grid.append(card);
     }
-    mine.append(h1, xgrid, h2, grid, el("div", "gmm-fine", "놀이용 가상 결제예요. 실제 돈은 나가지 않으며, 충전 횟수는 서버 날짜 기준으로 매일 초기화돼요."));
+    mine.append(h2, grid, el("div", "gmm-fine", "놀이용 가상 결제예요. 실제 돈은 나가지 않으며, 충전 횟수는 서버 날짜 기준으로 매일 초기화돼요.\n소환권은 상점 [주요 아이템]이나 소환 화면 상단에서 에테르로 교환해요."));
     pane.append(mine);
     mine.scrollTop = scroll;
   }
@@ -750,6 +733,11 @@
 .gmm-codex .cx-grid.wide .cx-item img { aspect-ratio: 16 / 9; object-fit: cover; object-position: center; }
 .gmm-codex .cx-item span { padding: .25em .4em .3em; background: var(--c-card); border-top: 1px solid var(--c-line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gmm-codex[data-skin="mallang"] .cx-item span { border-top: 2px solid var(--c-line); }
+.gmm-codex .cx-item { position: relative; contain: layout paint; }
+.gmm-codex .cx-item[data-miss]::before { content: "미획득"; position: absolute; top: .45em; left: .45em; z-index: 1; padding: .05em .6em; font-size: .75em;
+  border-radius: var(--c-pill); color: #fff; background: rgba(8, 10, 16, .7); }
+.gmm-codex .cx-item[data-miss] img { filter: saturate(.5) brightness(.8); transition: filter 140ms ease; }
+.gmm-codex .cx-item[data-miss]:hover img { filter: none; }
 .gmm-codex .cx-item[data-r="5"] { border-color: #E0A100; } .gmm-codex .cx-item[data-r="4"] { border-color: #8E6BD6; }
 .gmm-codex .cx-empty { padding: 2em 1em; text-align: center; opacity: .75; line-height: 1.6; white-space: pre-line; }
 .gmm-codex .cx-view { position: absolute; inset: 0; z-index: 2; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: .6em; padding: 1em; border-radius: inherit; background: rgba(8, 10, 16, .9); }
@@ -789,10 +777,16 @@
       out.outfits = (d.outfits || []).filter((x) => x.url).map((x) => ({ ...x, name: x.name + (x.kit ? " · " + x.kit : "") }));
       for (const k of ["story", "cg", "banner", "bond"]) out[k] = (bg[k] || []).filter((x) => x.url);
     } else out.error = "캐릭터 · 배경을 불러오지 못했어요 (" + home.reason.message + ").";
-    if (extra.status === "fulfilled") { out.enemies = extra.value.enemies || []; out.battle = extra.value.battle || []; }
+    if (extra.status === "fulfilled") {
+      out.enemies = extra.value.enemies || []; out.battle = extra.value.battle || [];
+      // The 1.5 patch lists every unit of the world, pulled or not; an older one leaves these out (owned only then).
+      if (Array.isArray(extra.value.units)) out.units = extra.value.units.filter((x) => x.url);
+      if (Array.isArray(extra.value.outfits)) out.outfits = extra.value.outfits.filter((x) => x.url).map((x) => ({ ...x, name: x.name + (x.kit ? " · " + x.kit : "") }));
+    }
     else if (!unpatched(extra.reason)) out.error ||= "적 이미지를 불러오지 못했어요 (" + extra.reason.message + ").";
     return out;
   }
+  let codexCache = null;
   function closeCodex() { codex?.node.remove(); codex = null; }
   // Inside the game's own element: full screen shows only that element, so a page on the document body was
   // hidden behind it. The game redraws its content now and then; paint() puts the page back if it was dropped.
@@ -817,7 +811,10 @@
     mountCodex(node);
     codex = { node, tab: "enemies", data: null, sheet, tabs, body, sum };
     if (!id) { body.append(el("div", "cx-empty", "세계를 연 뒤에 볼 수 있어요.")); sum.textContent = ""; return; }
-    const data = await loadCodex(id);
+    // Opening it again soon after reuses the last lists instead of asking the server twice.
+    const fresh = codexCache && codexCache.run === id && Date.now() - codexCache.at < 120000;
+    const data = fresh ? codexCache.data : await loadCodex(id);
+    if (!fresh && !data.error) codexCache = { run: id, at: Date.now(), data };
     if (!codex || codex.node !== node) return;
     codex.data = data;
     if (!(data.enemies || []).length && data.units.length) codex.tab = "units";
@@ -827,30 +824,40 @@
     const c = codex;
     if (!c || !c.data) return;
     const d = c.data;
-    const total = TABS.reduce((s, [k]) => s + (d[k] || []).length, 0);
+    const owned = (l) => (l || []).filter((x) => x.owned !== false).length;
+    const total = TABS.reduce((s, [k]) => s + owned(d[k]), 0);
     c.sum.textContent = "모은 그림 " + fmt(total) + "장";
-    c.tabs.replaceChildren(...TABS.map(([k, label]) => {
-      const b = el("button", "", label); b.type = "button";
-      b.append(el("small", "", d[k] == null ? "패치" : String(d[k].length)));
-      b.setAttribute("aria-pressed", String(c.tab === k));
-      b.addEventListener("click", () => { c.tab = k; paintCodex(); });
-      return b;
-    }));
+    // The tab row is built once; switching only flips aria-pressed and redraws the grid.
+    if (!c.tabs.childElementCount) {
+      c.tabs.append(...TABS.map(([k, label]) => {
+        const b = el("button", "", label); b.type = "button"; b.dataset.tab = k;
+        const list = d[k], missing = list ? list.length - owned(list) : 0;
+        b.append(el("small", "", list == null ? "패치" : missing ? owned(list) + "/" + list.length : String(list.length)));
+        return b;
+      }));
+      c.tabs.addEventListener("click", (e) => { const b = e.target.closest("button[data-tab]"); if (b && b.dataset.tab !== c.tab) { c.tab = b.dataset.tab; paintCodex(); } });
+    }
+    for (const b of c.tabs.children) b.setAttribute("aria-pressed", String(b.dataset.tab === c.tab));
     const [, , wide] = TABS.find(([k]) => k === c.tab);
     const list = d[c.tab];
+    c.body.scrollTop = 0;
     c.body.replaceChildren();
     if (d.error) c.body.append(el("div", "cx-empty", d.error));
     if (list == null) { c.body.append(el("div", "cx-empty", "적 · 전투 배경 그림은 서버 패치가 있어야 볼 수 있어요.\n이 확장 폴더의 patch/apply-patch.mjs를 실행하고 마리나라를 다시 켜 주세요.")); return; }
     if (!list.length) { c.body.append(el("div", "cx-empty", "아직 모은 그림이 없어요.\n게임을 진행하면 그려진 그림이 여기에 모여요.")); return; }
     const grid = el("div", "cx-grid" + (wide ? " wide" : ""));
+    const frag = document.createDocumentFragment();
     list.forEach((item, i) => {
-      const b = el("button", "cx-item"); b.type = "button";
+      const b = el("button", "cx-item"); b.type = "button"; b.dataset.i = String(i);
       if (item.rarity) b.dataset.r = String(item.rarity);
-      const img = el("img"); img.loading = "lazy"; img.alt = ""; img.src = item.url;
+      if (item.owned === false) { b.dataset.miss = ""; b.title = "미획득"; }
+      const img = el("img"); img.loading = "lazy"; img.decoding = "async"; img.alt = ""; img.src = item.url;
       b.append(img, el("span", "", item.name || "이름 없음"));
-      b.addEventListener("click", () => view(list, i));
-      grid.append(b);
+      frag.append(b);
     });
+    grid.append(frag);
+    // One listener for the whole grid instead of one per picture.
+    grid.addEventListener("click", (e) => { const b = e.target.closest(".cx-item"); if (b) view(list, Number(b.dataset.i)); });
     c.body.append(grid);
   }
   function view(list, at) {
@@ -858,7 +865,7 @@
     if (!c) return;
     c.sheet.querySelector(":scope > .cx-view")?.remove();
     const v = el("div", "cx-view"), img = el("img"), bar = el("div", "cx-bar"), name = el("span");
-    const show = (i) => { at = (i + list.length) % list.length; img.src = list[at].url; name.textContent = (list[at].name || "이름 없음") + "  (" + (at + 1) + " / " + list.length + ")"; };
+    const show = (i) => { at = (i + list.length) % list.length; img.src = list[at].url; name.textContent = (list[at].name || "이름 없음") + (list[at].owned === false ? " · 미획득" : "") + "  (" + (at + 1) + " / " + list.length + ")"; };
     const btn = (t, fn) => { const b = el("button", "", t); b.type = "button"; b.addEventListener("click", (e) => { e.stopPropagation(); fn(); }); return b; };
     bar.append(btn("◀", () => show(at - 1)), name, btn("▶", () => show(at + 1)), btn("닫기", () => v.remove()));
     v.append(img, bar);
@@ -888,7 +895,9 @@
     if (!root) return;
     if (observed !== root) {
       observer?.disconnect();
-      observer = new MutationObserver(schedule);
+      // Changes inside our own pieces (the 충전소 page, the codex, the box) never need a repaint: skip those so a
+      // redraw of ours does not wake the next one. Battles change the screen many times a second; this keeps it light.
+      observer = new MutationObserver((records) => { if (records.some(foreign)) schedule(); });
       observer.observe(root, { childList: true, subtree: true });
       observed = root;
     }
@@ -910,8 +919,11 @@
     tag.textContent = GAME_CSS;
     mine.prepend(tag);
   }
-  // The game's element comes and goes with the Home tab; look for it now and then.
-  const poll = setInterval(() => { if (host()?.shadowRoot !== observed) schedule(); }, 1000);
+  const OWN = ".gmm-pane, .gmm-codex, .gmm-ask, .gmm-cur, .gmm-tile, .gmm-cat, .gmm-codex-btn";
+  const ownNode = (n) => n && n.nodeType === 1 && (n.matches(OWN) || !!n.closest(OWN));
+  const foreign = (r) => !ownNode(r.target) && ![...r.addedNodes, ...r.removedNodes].every(ownNode);
+  // The game's element comes and goes with the Home tab; look for it now and then (not while the page is hidden).
+  const poll = setInterval(() => { if (!document.hidden && host()?.shadowRoot !== observed) schedule(); }, 1000);
   schedule();
 
   window[KEY] = () => {
@@ -923,6 +935,8 @@
     if (root) {
       for (const n of root.querySelectorAll(".gmm-cat, .gmm-pane, .gmm-codex-btn, .gmm-cur, .gmm-ask, .gmm-tile")) n.remove();
       for (const n of root.querySelectorAll(".gmm-open")) n.classList.remove("gmm-open");
+      for (const n of root.querySelectorAll("[data-gmm-base]")) n.textContent = n.dataset.gmmBase;
+      for (const n of root.querySelectorAll("style[data-gmm]")) n.remove();
       if (gameSheet) root.adoptedStyleSheets = root.adoptedStyleSheets.filter((s) => s !== gameSheet);
     }
     delete window[KEY];
