@@ -1,4 +1,4 @@
-/* Gacha More Money v1.5.3 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.6.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 글리머 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -265,6 +265,7 @@
 :host(:not([data-gfx-style="trickcal"])) .gmm-pane h3 { font-weight: 700; padding-bottom: .15em; border-bottom: 1px solid var(--gmm-edge); }
 .gmm-pane h3 small { font-size: .7em; opacity: .7; font-weight: 400; }
 .gmm-tile .art .gmm-ic { display: block; width: 100%; aspect-ratio: 1; }
+.gmm-hide { display: none !important; }
 /* Drawn icons: a soft shadow under them. */
 .gmm-svg { overflow: visible; filter: drop-shadow(0 .1em .08em rgba(0, 0, 0, .22)); }
 /* "결제할까요?" can be taken back: a small round ✕ beside the pay button, in the same row (no card grows). */
@@ -474,19 +475,72 @@
     buying = "";
     schedule();
   }
-  // The game counts "on sale / all" under [주요 아이템]; the four ticket tiles count too. The game's own text is
-  // remembered (a fresh draw replaces ours) and both figures raised by the tiles shown.
+  // A count the game drew, with ours added to every figure in it ("3 / 5" + 4 → "7 / 9", "2" + 3 → "5"). The game's
+  // own text is remembered (a fresh draw replaces ours). Compared by its figures, not its words: a translation
+  // extension may reword "7 of 9" to "7 / 9" after us.
+  const figures = (t) => (t.match(/\d[\d,]*/g) || []).join("|");
+  function raiseCount(n, add) {
+    const cur = n.textContent;
+    if (!n.dataset.gmmBase || figures(cur) !== n.dataset.gmmShown) n.dataset.gmmBase = cur;
+    const base = n.dataset.gmmBase;
+    const text = add ? base.replace(/\d[\d,]*/g, (d) => (Number(d.replace(/,/g, "")) + add).toLocaleString("en-US")) : base;
+    n.dataset.gmmShown = figures(text);
+    if (figures(cur) !== figures(text)) n.textContent = text;
+  }
+  // The shop counts "on sale / all" under [주요 아이템]; the four ticket tiles count too.
   function paintKeyCount(rail) {
     const n = rail.querySelector(':scope > .sh-cat[data-shop-cat="key"] .sh-cat-n');
-    if (!n) return;
-    // Compared by its figures, not its words: a translation extension may reword "7 of 9" to "7 / 9" after us.
-    const nums = (t) => { const m = /(\d+)\D+(\d+)/.exec(t); return m ? m[1] + "," + m[2] : ""; };
-    const cur = n.textContent;
-    if (!n.dataset.gmmBase || nums(cur) !== n.dataset.gmmShown) n.dataset.gmmBase = cur;
-    const base = n.dataset.gmmBase, m = /(\d+)(\D+)(\d+)/.exec(base), add = patchMissing || !status ? 0 : EXCHANGE.length;
-    const text = m && add ? base.replace(m[0], Number(m[1]) + add + m[2] + (Number(m[3]) + add)) : base;
-    n.dataset.gmmShown = nums(text);
-    if (cur !== text && nums(cur) !== nums(text)) n.textContent = text;
+    if (n) raiseCount(n, patchMissing || !status ? 0 : EXCHANGE.length);
+  }
+
+  /* ═════════════ Inventory → Key Items: the tickets in the bag ═════════════
+   * Beside the game's own items, same tiles; the bag's count (items held) takes the tickets in. [소환] opens the
+   * summon screen on the banner that ticket pays for. */
+  function goSummon(t) {
+    const h = host();
+    try { h._openSummon(); if (t === "ltd") { h._summonBannerId = "char-featured"; h._renderBrowser(); } } catch {}
+  }
+  let bagSeen = false;
+  function paintBag(root) {
+    const screen = root.querySelector('[data-screen="inventory"]');
+    if (!screen) { bagSeen = false; return; }
+    // Fresh counts each time the bag opens (a pull or an exchange may have changed them since).
+    loadStatus(!bagSeen); bagSeen = true;
+    const tk = !patchMissing && status && status.tickets, std = tk ? Number(tk.std) || 0 : 0, ltd = tk ? Number(tk.ltd) || 0 : 0;
+    const count = screen.querySelector('[data-inv-section="keyitems"] .n i');
+    if (count) raiseCount(count, std + ltd);
+    const pane = screen.querySelector('.pane[data-in="right"]');
+    if (!pane) return;
+    const show = (std || ltd) && screen.querySelector('[data-inv-section="keyitems"][aria-pressed="true"]');
+    const empty = pane.querySelector(":scope > .grid-empty");
+    let grid = pane.querySelector(":scope > .grid-wrap.item-board > .grid");
+    if (!show) {
+      pane.querySelector(":scope > .gmm-bagwrap")?.remove();
+      grid?.querySelectorAll(":scope > .gmm-tile").forEach((n) => n.remove());
+      empty?.classList.remove("gmm-hide");
+      return;
+    }
+    // An empty bag: the game says "nothing in the bag"; hide that and hold the tickets in a shelf of our own.
+    if (!grid) {
+      const wrap = el("div", "grid-wrap item-board gmm-bagwrap"); grid = el("div", "grid"); wrap.append(grid);
+      pane.append(wrap);
+    }
+    empty?.classList.add("gmm-hide");
+    const key = std + ":" + ltd;
+    if (grid.dataset.gmmKey === key && grid.querySelector(":scope > .gmm-tile")) return;
+    grid.dataset.gmmKey = key;
+    grid.querySelectorAll(":scope > .gmm-tile").forEach((n) => n.remove());
+    for (const [t, qty] of [["std", std], ["ltd", ltd]]) {
+      if (!qty) continue;
+      const tkd = TICKETS[t];
+      const tile = el("div", "tile item has gmm-tile"); tile.title = tkd.name + " (" + tkd.kind + ") " + fmt(qty) + "장";
+      const art = el("span", "art"); art.append(icon(t));
+      const b = el("button", "ki-use", "소환"); b.type = "button";
+      b.addEventListener("click", (e) => { e.stopPropagation(); goSummon(t); });
+      const act = el("span", "act"); act.append(b);
+      tile.append(art, el("span", "st", t === "std" ? "상시" : "한정"), el("span", "fig", fmt(qty)), el("span", "lv", tkd.name), act);
+      grid.append(tile);
+    }
   }
   function paintShop(root) {
     const screen = root.querySelector('[data-screen="shop"]');
@@ -950,6 +1004,7 @@
     if (codex && !codex.node.isConnected) mountCodex(codex.node);
     paintShop(root);
     paintSummon(root);
+    paintBag(root);
     paintCodexButton(root);
     copySheetForLeave(root);
   }
@@ -957,14 +1012,14 @@
   // A tag of our own inside our first element there keeps the copy styled (in the live screen it repeats rules).
   function copySheetForLeave(root) {
     const view = root.querySelector(".gf-stage > .gf-view");
-    const mine = view?.querySelector(".gmm-pane, .gmm-cat, .gmm-tile, .gmm-codex-btn");
+    const mine = view?.querySelector(".gmm-pane, .gmm-cat, .gmm-tile, .gmm-codex-btn, .gmm-bagwrap");
     if (!mine || view.querySelector("style[data-gmm]")) return;
     const tag = document.createElement("style");
     tag.dataset.gmm = "";
     tag.textContent = GAME_CSS;
     mine.prepend(tag);
   }
-  const OWN = ".gmm-pane, .gmm-codex, .gmm-ask, .gmm-cur, .gmm-tile, .gmm-cat, .gmm-codex-btn";
+  const OWN = ".gmm-pane, .gmm-codex, .gmm-ask, .gmm-cur, .gmm-tile, .gmm-cat, .gmm-codex-btn, .gmm-bagwrap";
   const ownNode = (n) => n && n.nodeType === 1 && (n.matches(OWN) || !!n.closest(OWN));
   const foreign = (r) => !ownNode(r.target) && ![...r.addedNodes, ...r.removedNodes].every(ownNode);
   // The game's element comes and goes with the Home tab; look for it now and then (not while the page is hidden).
@@ -981,6 +1036,8 @@
       for (const n of root.querySelectorAll(".gmm-cat, .gmm-pane, .gmm-codex-btn, .gmm-cur, .gmm-ask, .gmm-tile")) n.remove();
       for (const n of root.querySelectorAll(".gmm-open")) n.classList.remove("gmm-open");
       for (const n of root.querySelectorAll("[data-gmm-base]")) n.textContent = n.dataset.gmmBase;
+      for (const n of root.querySelectorAll(".gmm-bagwrap")) n.remove();
+      for (const n of root.querySelectorAll(".gmm-hide")) n.classList.remove("gmm-hide");
       for (const n of root.querySelectorAll("style[data-gmm]")) n.remove();
       if (gameSheet) root.adoptedStyleSheets = root.adoptedStyleSheets.filter((s) => s !== gameSheet);
     }
