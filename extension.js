@@ -1,5 +1,5 @@
-/* Gacha More Money v1.5.2 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
- *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 반짝이 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
+/* Gacha More Money v1.5.3 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+ *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 글리머 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
  * The wallet lives in the game's own save, which no browser request can change, so the top-up and the enemy list
@@ -46,7 +46,7 @@
     ltd: { key: "gmmTicketLtd", name: "월휘", kind: "한정 소환권", tone: "ltd" },
   };
   const PACKS = [
-    { id: "starter", name: "첫걸음 꾸러미", icon: "gift", grant: "에테르 1,600 · 자금 50,000 · 월휘 1장", note: "가장 알찬 구성", price: "₩4,400", tone: "gift", best: "추천" },
+    { id: "starter", name: "첫걸음 꾸러미", icon: "gift", grant: "에테르 1,600 · 자금 5만 · 월휘 1장", note: "가장 알찬 구성", price: "₩4,400", tone: "gift", best: "추천" },
     { id: "ticket-ltd", name: "월휘 꾸러미", icon: "ltd", grant: "월휘 10장", note: "한정 배너 10회 소환", price: "₩33,000", tone: "ltd", best: "인기!" },
     { id: "ticket-std", name: "성휘 꾸러미", icon: "std", grant: "성휘 10장", note: "상시 배너 10회 소환", price: "₩33,000", tone: "std" },
     { id: "aether-s", name: "에테르 한 줌", icon: "aether1", grant: "에테르 1,600", note: "소환권 10장어치", price: "₩33,000", tone: "aether" },
@@ -55,7 +55,7 @@
     { id: "funds-s", name: "자금 자루", icon: "coins", grant: "자금 100,000", note: "레벨업 · 승급용", price: "₩11,000", tone: "funds" },
     { id: "funds-l", name: "자금 금괴", icon: "ingot", grant: "자금 300,000", note: "레벨업 · 승급용", price: "₩29,000", tone: "funds" },
     { id: "vigor", name: "활력 드링크", icon: "vigor", grant: "활력 +60", note: "최대치를 넘어 채워져요", price: "₩5,500", tone: "vigor" },
-    { id: "glimmer", name: "반짝이 주머니", icon: "glimmer", grant: "반짝이 300", note: "상점 물건 구매용", price: "₩8,800", tone: "glimmer" },
+    { id: "glimmer", name: "글리머 주머니", icon: "glimmer", grant: "글리머 300", note: "상점 물건 구매용", price: "₩8,800", tone: "glimmer" },
   ];
   const DAILY = 3;
   // The weekly pass (keep in sync with patch PASS): not counted in the daily three.
@@ -267,11 +267,15 @@
 .gmm-tile .art .gmm-ic { display: block; width: 100%; aspect-ratio: 1; }
 /* Drawn icons: a soft shadow under them. */
 .gmm-svg { overflow: visible; filter: drop-shadow(0 .1em .08em rgba(0, 0, 0, .22)); }
-/* "결제할까요?" can be taken back: a quiet text button under the pay button. */
-.gmm-pack .gmm-cancel, .gmm-pass-act .gmm-cancel { width: auto; margin: 0; padding: .1em .6em; cursor: pointer; font: inherit; font-size: calc(var(--f, 10px) * .85);
-  color: var(--gmm-text); opacity: .75; background: none; border: 0; box-shadow: none; clip-path: none; text-decoration: underline; text-underline-offset: .2em; }
-.gmm-pack .gmm-cancel:hover, .gmm-pass-act .gmm-cancel:hover { opacity: 1; }
-.gmm-pass-act { display: flex; flex-direction: column; align-items: center; gap: .2em; }
+/* "결제할까요?" can be taken back: a small round ✕ beside the pay button, in the same row (no card grows). */
+.gmm-buyrow { display: flex; align-items: stretch; gap: .35em; width: 100%; margin-top: .3em; }
+.gmm-pack .gmm-buyrow > button:not(.gmm-cancel) { flex: 1 1 auto; min-width: 0; width: auto; margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.gmm-buyrow > .gmm-cancel, .gmm-pass-act > .gmm-cancel { flex: none; width: auto; aspect-ratio: 1; margin: 0; padding: 0 .55em; cursor: pointer; font: inherit; line-height: 1;
+  color: var(--gmm-text); background: var(--gmm-card-hi); border: var(--gmm-bw2) solid var(--gmm-line); border-radius: 50%; clip-path: none;
+  box-shadow: 0 calc(var(--gmm-drop) * .6) 0 var(--gmm-line); animation: gmm-fade .15s ease-out; }
+.gmm-buyrow > .gmm-cancel:hover, .gmm-pass-act > .gmm-cancel:hover { border-color: var(--gmm-accent); color: var(--gmm-accent); }
+:host(:not([data-gfx-style="trickcal"])) :is(.gmm-buyrow, .gmm-pass-act) > .gmm-cancel { border: 1px solid var(--gmm-edge); }
+.gmm-pass-act { display: flex; align-items: stretch; gap: .35em; }
 /* Drawings fill their box once styled. */
 .gmm-svg { width: 100%; height: 100%; }
 /* The top bar on the summon screen: tickets for this banner, like the game's own currency chips. */
@@ -317,6 +321,8 @@
 :host([data-gfx-style="trickcal"]) .gmm-ask-btns button { font-weight: 400; }
 .gmm-pack .gmm-nm { font-size: calc(var(--f, 10px) * 1.25); }
 .gmm-pack .gmm-gr { font-size: calc(var(--f, 10px) * 1.05); color: var(--gmm-accent); }
+/* Every card keeps one line per text, so a row of cards stays one height. */
+.gmm-pack :is(.gmm-nm, .gmm-gr, .gmm-nt) { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gmm-pack .gmm-nt { font-size: calc(var(--f, 10px) * .8); opacity: .75; }
 .gmm-pack button { margin-top: .3em; width: 100%; font-size: calc(var(--f, 10px) * 1.15); padding: .35em .6em; color: var(--gmm-buy-fg); background: var(--gmm-buy-bg); }
 .gmm-pack button:active:not(:disabled) { translate: 0 .15em; box-shadow: 0 calc(var(--gmm-drop) * .17) 0 var(--gmm-line); }
@@ -373,7 +379,7 @@
   }
   function cancelConfirm() { if (!confirming) return false; confirming = ""; clearTimeout(confirmTimer); schedule(); return true; }
   const cancelButton = () => {
-    const c = el("button", "gmm-cancel", "취소"); c.type = "button";
+    const c = el("button", "gmm-cancel", "✕"); c.type = "button"; c.title = "취소"; c.setAttribute("aria-label", "취소");
     c.addEventListener("click", (e) => { e.stopPropagation(); cancelConfirm(); });
     return c;
   };
@@ -537,8 +543,10 @@
       if (confirming === p.id) b.dataset.ask = "";
       b.disabled = !!buying || patchMissing || left === 0;
       b.addEventListener("click", (e) => { e.stopPropagation(); buy(p); });
-      card.append(icon(p.icon), el("span", "gmm-nm", p.name), el("span", "gmm-gr", p.grant), el("span", "gmm-nt", p.note), b);
-      if (confirming === p.id && !buying) card.append(cancelButton());
+      const row = el("div", "gmm-buyrow"); row.append(b);
+      if (confirming === p.id && !buying) row.append(cancelButton());
+      const gr = el("span", "gmm-gr", p.grant); gr.title = p.grant;
+      card.append(icon(p.icon), el("span", "gmm-nm", p.name), gr, el("span", "gmm-nt", p.note), row);
       grid.append(card);
     }
     mine.append(h2, grid, el("div", "gmm-fine", "놀이용 가상 결제예요. 실제 돈은 나가지 않으며, 충전 횟수는 서버 날짜 기준으로 매일 초기화돼요.\n소환권은 상점 [주요 아이템]이나 소환 화면 상단에서 에테르로 교환해요."));

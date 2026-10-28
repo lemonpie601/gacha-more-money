@@ -3,7 +3,7 @@
  *
  * 가챠 포지(gacha-forge) 패키지의 server.mjs에 세 가지 요청을 덧붙입니다.
  *   POST /api/gacha-forge/more-money/status  오늘 남은 충전 횟수
- *   POST /api/gacha-forge/more-money/topup     충전(하루 3번): 에테르 · 자금 · 활력 · 반짝이 · 소환권을 지갑에 넣음
+ *   POST /api/gacha-forge/more-money/topup     충전(하루 3번): 에테르 · 자금 · 활력 · 글리머 · 소환권을 지갑에 넣음
  *   POST /api/gacha-forge/more-money/exchange  에테르로 소환권 사기
  *   POST /api/gacha-forge/more-money/codex     도감용 적 이미지 · 전투 배경 · 세계의 모든 캐릭터 · 의상(미획득 포함) 목록
  *   POST /api/gacha-forge/more-money/pass/buy    주간 패스 구매(7일): 바로 받는 보상
