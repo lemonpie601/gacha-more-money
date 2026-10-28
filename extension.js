@@ -1,4 +1,4 @@
-/* Gacha More Money v1.0.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.0.1 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 팩을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
  * The wallet lives in the game's own save, which no browser request can change, so the top-up and the enemy list
@@ -83,12 +83,14 @@
 .gmm-codex-btn { position: absolute; left: 1.6%; top: calc(10.5% + var(--f, 10px) * 2.6); z-index: 500; pointer-events: auto; cursor: pointer;
   font-family: "Jua", "Malgun Gothic", sans-serif; font-size: calc(var(--f, 10px) * .95); padding: .3em .9em; border-radius: 999px;
   color: var(--gfx-text, #4A3020); background: var(--gfx-card, #FFFDF5); border: 2px solid var(--gfx-line, #6B4528); box-shadow: 0 .18em 0 var(--gfx-line, #6B4528); }
+.gmm-codex-btn { display: inline-flex; align-items: center; gap: .3em; }
+.gmm-codex-btn .gmm-ic-book { width: 1.15em; height: 1.15em; flex: none; }
 .gmm-codex-btn:active { translate: 0 .12em; box-shadow: 0 .06em 0 var(--gfx-line, #6B4528); }
 .gfx-lobby[data-edit] > .gmm-codex-btn { display: none; }
 `;
   let gameSheet = null;
   function ensureGameSheet(root) {
-    if (!gameSheet) { gameSheet = new CSSStyleSheet(); gameSheet.replaceSync(GAME_CSS); }
+    if (!gameSheet) { gameSheet = new CSSStyleSheet(); gameSheet.replaceSync(GAME_CSS + PAGE_CSS); }
     if (!root.adoptedStyleSheets.includes(gameSheet)) root.adoptedStyleSheets = [...root.adoptedStyleSheets, gameSheet];
   }
 
@@ -181,6 +183,8 @@
   }
 
   /* ═════════════ Lobby: [도감] button ═════════════ */
+  // A little open book, drawn in the button's text colour (an emoji looked different on every device).
+  const BOOK_ICON = '<svg class="gmm-ic-book" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.6 3.5 5v13c3.5-.4 6.5 0 8.5 1.5 2-1.5 5-1.9 8.5-1.5V5C17 4.6 14 5 12 6.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 6.5v13" stroke="currentColor" stroke-width="2"/></svg>';
   function paintCodexButton(root) {
     const home = root.querySelector(".hm-screen");
     const old = root.querySelector(".gmm-codex-btn");
@@ -190,7 +194,9 @@
     const parent = lobby && lobby.querySelector(":scope > .gfx-lobby-tools") ? lobby : home;
     if (old && old.parentElement === parent) return;
     old?.remove();
-    const b = el("button", "gmm-codex-btn", "📖 도감"); b.type = "button";
+    const b = el("button", "gmm-codex-btn"); b.type = "button";
+    b.innerHTML = BOOK_ICON;
+    b.append("도감");
     b.addEventListener("click", (e) => { e.stopPropagation(); openCodex(); });
     b.addEventListener("pointerdown", (e) => e.stopPropagation());
     parent.append(b);
@@ -229,8 +235,6 @@
 .gmm-codex .cx-view button { cursor: pointer; font: inherit; padding: .25em 1em; border-radius: 999px; color: var(--c-text); background: var(--c-card); border: 2px solid var(--c-line); }
 @media (max-width: 600px) { .gmm-codex .cx-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); } .gmm-codex .cx-head h2 { font-size: 1.3em; } }
 `;
-  const pageStyle = el("style"); pageStyle.textContent = PAGE_CSS; document.head.append(pageStyle);
-  cleanups.push(() => pageStyle.remove());
 
   const TABS = [
     ["enemies", "적", false], ["units", "캐릭터", false], ["outfits", "의상", false],
@@ -262,6 +266,13 @@
     return out;
   }
   function closeCodex() { codex?.node.remove(); codex = null; }
+  // Inside the game's own element: full screen shows only that element, so a page on the document body was
+  // hidden behind it. The game redraws its content now and then; paint() puts the page back if it was dropped.
+  function mountCodex(node) {
+    const root = host()?.shadowRoot;
+    if (root) { ensureGameSheet(root); root.append(node); }
+    else document.body.append(node);
+  }
   async function openCodex() {
     closeCodex();
     const id = runId();
@@ -275,7 +286,7 @@
     sheet.append(head, tabs, body);
     node.append(sheet);
     node.addEventListener("click", (e) => { if (e.target === node) closeCodex(); });
-    document.body.append(node);
+    mountCodex(node);
     codex = { node, tab: "enemies", data: null, sheet, tabs, body, sum };
     if (!id) { body.append(el("div", "cx-empty", "세계를 연 뒤에 볼 수 있어요.")); sum.textContent = ""; return; }
     const data = await loadCodex(id);
@@ -353,6 +364,7 @@
       observed = root;
     }
     ensureGameSheet(root);
+    if (codex && !codex.node.isConnected) mountCodex(codex.node);
     paintShop(root);
     paintCodexButton(root);
   }
