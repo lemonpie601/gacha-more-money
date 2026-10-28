@@ -1,4 +1,4 @@
-/* Gacha More Money v1.1.2 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.2.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 반짝이 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -132,6 +132,7 @@
 .gmm-x { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5em .6em; padding: .55em .8em; border-radius: 18px;
   background: var(--gfx-card, #FFFDF5); border: 3px solid var(--gfx-line, #6B4528); box-shadow: 0 .24em 0 var(--gfx-line, #6B4528); }
 .gmm-x .gmm-ic { display: block; width: calc(var(--f, 10px) * 3.4); height: calc(var(--f, 10px) * 3.4); }
+.gmm-tile .art .gmm-ic { display: block; width: 100%; aspect-ratio: 1; }
 .gmm-tix .gmm-ic { display: block; width: 2.2em; height: 2.2em; margin: -.35em 0; }
 /* Drawn icons: outlined like the rest of 말랑 UI, a sticker shadow under them. */
 .gmm-svg { overflow: visible; filter: drop-shadow(0 .1em 0 color-mix(in srgb, var(--gfx-line, #6B4528) 45%, transparent)); }
@@ -275,7 +276,7 @@
     for (const other of rail.querySelectorAll(":scope > .sh-cat:not(.gmm-cat)")) if (shopOpen && other.classList.contains("on")) other.classList.remove("on");
     pane.classList.toggle("gmm-open", shopOpen);
     let mine = pane.querySelector(":scope > .gmm-pane");
-    if (!shopOpen) { mine?.remove(); return; }
+    if (!shopOpen) { mine?.remove(); paintKeyItems(rail, pane); return; }
     const key = JSON.stringify([left, buying, confirming, patchMissing, lastNote, status && status.tickets, aether()]);
     if (mine && mine.dataset.key === key) return;
     const scroll = mine ? mine.scrollTop : 0;
@@ -303,6 +304,31 @@
     mine.append(h1, xgrid, h2, grid, el("div", "gmm-fine", "놀이용 가상 결제예요. 실제 돈은 나가지 않으며, 충전 횟수는 서버 날짜 기준으로 매일 초기화돼요."));
     pane.append(mine);
     mine.scrollTop = scroll;
+  }
+
+  /* ═════════════ Shop → Key Items: the tickets on the game's own shelf ═════════════
+   * Same tiles as the game's items (art, tag, name, buy button), after its own; they pay in aether. */
+  function paintKeyItems(rail, pane) {
+    const grid = pane.querySelector(":scope > .item-board > .grid");
+    const onKey = !!rail.querySelector(':scope > .sh-cat.on[data-shop-cat="key"]');
+    if (!grid || !onKey || patchMissing || !status) { grid?.querySelectorAll(":scope > .gmm-tile").forEach((n) => n.remove()); return; }
+    const a = aether();
+    const key = JSON.stringify([status.tickets, buying, a]);
+    if (grid.dataset.gmmKey === key && grid.querySelector(":scope > .gmm-tile")) return;
+    grid.dataset.gmmKey = key;
+    grid.querySelectorAll(":scope > .gmm-tile").forEach((n) => n.remove());
+    for (const x of EXCHANGE) {
+      const tk = TICKETS[x.ticket], short = a != null && a < x.cost;
+      const tile = el("div", "tile item has gmm-tile" + (short ? " short" : ""));
+      tile.title = tk.name + " " + x.qty + "장 (" + tk.kind + ")";
+      const art = el("span", "art"); art.append(icon(x.ticket));
+      const b = el("button", "sh-buy", buying === x.id ? "교환 중…" : "✦ " + fmt(x.cost)); b.type = "button";
+      b.disabled = !!buying || short;
+      b.addEventListener("click", (e) => { e.stopPropagation(); exchange(x); });
+      const act = el("span", "act"); act.append(b);
+      tile.append(art, el("span", "st", "보유 " + fmt(held(x.ticket) ?? 0) + "장"), el("span", "lv", tk.name + " ×" + x.qty), act);
+      grid.append(tile);
+    }
   }
 
   /* ═════════════ Summon: tickets instead of aether ═════════════
@@ -547,7 +573,7 @@
     for (const fn of cleanups) { try { fn(); } catch {} }
     const root = host()?.shadowRoot;
     if (root) {
-      for (const n of root.querySelectorAll(".gmm-cat, .gmm-pane, .gmm-codex-btn, .gmm-tix")) n.remove();
+      for (const n of root.querySelectorAll(".gmm-cat, .gmm-pane, .gmm-codex-btn, .gmm-tix, .gmm-tile")) n.remove();
       for (const n of root.querySelectorAll(".gmm-open")) n.classList.remove("gmm-open");
       if (gameSheet) root.adoptedStyleSheets = root.adoptedStyleSheets.filter((s) => s !== gameSheet);
     }
