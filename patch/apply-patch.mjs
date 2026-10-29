@@ -5,7 +5,7 @@
  *   POST /api/gacha-forge/more-money/status  오늘 남은 충전 횟수
  *   POST /api/gacha-forge/more-money/topup     충전(하루 3번): 에테르 · 자금 · 활력 · 글리머 · 소환권을 지갑에 넣음 (첫걸음 꾸러미는 세계마다 한 번만)
  *   POST /api/gacha-forge/more-money/exchange  에테르로 소환권 사기
- *   POST /api/gacha-forge/more-money/codex     도감용 적 이미지 · 전투 배경 · 세계의 모든 캐릭터 · 의상(미획득 포함) · 메신저 사진 목록
+ *   POST /api/gacha-forge/more-money/codex     도감용 적 이미지 · 전투 배경 · 세계의 모든 캐릭터 · 의상(미획득 · 상점 미구매 포함) · 메신저 사진 목록
  *   POST /api/gacha-forge/more-money/pass/buy    주간 패스 구매(7일): 바로 받는 보상
  *   POST /api/gacha-forge/more-money/pass/claim  주간 패스 오늘 보상(하루 한 번, 7일 동안)
  * 충전 · 교환 · 주간 패스는 요청 번호(requestId)로 두 번 들어가지 않고, 최근 20건을 결제 내역으로 남깁니다.
@@ -148,10 +148,14 @@ function inject(src) {
     + `if(!P.active)return{ok:!1,error:"pass-inactive",pass:P};if(P.claimedToday)return{ok:!1,error:"pass-claimed",pass:P};__gmmGive(M,__gmmPassDef.daily);`
     + `S.moreMoneyPass={...S.moreMoneyPass,claimed:[...(S.moreMoneyPass.claimed||[]),__gmmDayNum()]};S.wallet=M;let rc=${receipt("pass-claim", '"pass"', "__gmmPassDef.daily", "0")};`
     + `return await ${writeRun}(o,b,S)?{ok:!0,granted:__gmmPassDef.daily,receipt:rc,wallet:${pub}(M,S),tickets:__gmmTickets(M),pass:__gmmPass(S),history:__gmmHist(S)}:{ok:!1,error:"write-conflict"}}),`
-    + `${router}.post("/more-money/codex",async p=>{${check}let c=await ${store}.getById(${pkg}.id,o+":combat-art"),d=c&&c.data||{},{data:S}=await ${readRun}(o),R=S&&S.roster||{},W=o+":unit:",U=[],F=[],N={},Ph=[];`
+    + `${router}.post("/more-money/codex",async p=>{${check}let c=await ${store}.getById(${pkg}.id,o+":combat-art"),d=c&&c.data||{},{data:S}=await ${readRun}(o),R=S&&S.roster||{},W=o+":unit:",U=[],F=[],N={},Ph=[],I={};`
     + `for(let M of await ${unitStore}.list(${unitPkg}.id,${unitKind})){if(!M||typeof M.id!="string"||!M.id.startsWith(W))continue;let _=M.data;if(!_||_.kind!=="character")continue;`
-    + `let own=!!(_.isProtagonist||R[M.id]),rar=Number(_.rarity)||0,nm=${str}(_.name);N[M.id.slice(W.length)]=nm;${str}(_.portrait)&&U.push({id:M.id,key:M.id,name:nm,url:${str}(_.portrait),rarity:rar,kit:[${str}(_.affinity),${str}(_.role)].filter(Boolean).join(" "),owned:own});`
+    + `let own=!!(_.isProtagonist||R[M.id]),rar=Number(_.rarity)||0,nm=${str}(_.name);N[M.id.slice(W.length)]=nm;I[M.id]={nm,rar};${str}(_.portrait)&&U.push({id:M.id,key:M.id,name:nm,url:${str}(_.portrait),rarity:rar,kit:[${str}(_.affinity),${str}(_.role)].filter(Boolean).join(" "),owned:own});`
     + `for(let x of ${outfitsOf}(_))${str}(x.url)&&F.push({key:x.id,unitId:M.id,name:nm,url:${str}(x.url),rarity:rar,kit:${str}(x.name),owned:own})}`
+    // Outfits the shop has offered (every rotation so far) but not bought yet: they are not on the unit, so add them unowned.
+    + `let FS=new Set(F.map(x=>x.key)),OP=o+":outfits:";for(let D of await ${unitStore}.list(${unitPkg}.id,"outfits")){if(!D||typeof D.id!="string"||!D.id.startsWith(OP))continue;`
+    + `for(let x of Array.isArray(D.data&&D.data.picks)?D.data.picks:[]){let k=${str}(x&&x.id),uid=${str}(x&&x.unitId),iu=I[uid];if(!k||FS.has(k)||!${str}(x.url))continue;FS.add(k);`
+    + `F.push({key:k,unitId:uid,name:iu?iu.nm:${str}(x.unitName),url:${str}(x.url),rarity:iu?iu.rar:0,kit:${str}(x.name),owned:!1,shop:!0})}}`
     // Messenger photos: the pictures characters sent in their chats (finished ones only), newest first.
     + `let C=o+":chat:";for(let D of await ${unitStore}.list(${unitPkg}.id,"chat")){if(!D||typeof D.id!="string"||!D.id.startsWith(C))continue;let q=D.data||{},who=N[D.id.slice(C.length)]||${str}(q.name)||"메신저";`
     + `for(let m of Array.isArray(q.messages)?q.messages:[]){let f=m&&m.photo;if(!f||f.pending||f.failed||!${str}(f.url)||!${str}(m.id))continue;Ph.push({key:D.id+"|"+m.id,name:who,url:${str}(f.url),at:Number(f.at||m.at)||0})}}`

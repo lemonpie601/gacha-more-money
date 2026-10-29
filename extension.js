@@ -1,4 +1,4 @@
-/* Gacha More Money v1.8.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.9.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 글리머 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -898,6 +898,7 @@
 .gmm-codex .cx-grid[hidden] { display: none; }
 .gmm-codex .cx-item[data-miss]::before { content: "미획득"; position: absolute; top: .45em; left: .45em; z-index: 1; padding: .05em .6em; font-size: .75em;
   border-radius: var(--c-pill); color: #fff; background: rgba(8, 10, 16, .7); }
+.gmm-codex .cx-item[data-shop]::before { content: "상점"; color: #1a1205; background: var(--c-pick); }
 .gmm-codex .cx-item[data-miss] img { filter: saturate(.5) brightness(.8); }
 .gmm-codex .cx-item[data-miss]:hover img { filter: none; }
 .gmm-codex .cx-item[data-r="5"] { border-color: #E0A100; } .gmm-codex .cx-item[data-r="4"] { border-color: #8E6BD6; }
@@ -1107,6 +1108,7 @@
       const b = el("button", "cx-item"); b.type = "button"; b.dataset.i = String(i);
       if (item.rarity) b.dataset.r = String(item.rarity);
       if (item.owned === false) { b.dataset.miss = ""; b.title = "미획득"; }
+      if (item.shop) { b.dataset.shop = ""; b.title = "상점 미구매"; }
       const img = el("img"); img.decoding = "async"; img.alt = "";
       b.dataset.src = item.url; b.dataset.tw = String(tw);
       b.append(img, el("span", "", item.name || "이름 없음"));
@@ -1125,7 +1127,7 @@
     c.sheet.querySelector(":scope > .cx-view")?.remove();
     const v = el("div", "cx-view"), img = el("img"), bar = el("div", "cx-bar"), name = el("span");
     const warm = (i) => { const u = list[(i + list.length) % list.length]?.url; if (u) { const p = new Image(); p.decoding = "async"; p.src = u; } };
-    const show = (i) => { at = (i + list.length) % list.length; img.src = list[at].url; warm(at + 1); warm(at - 1); name.textContent = (list[at].name || "이름 없음") + (list[at].owned === false ? " · 미획득" : "") + "  (" + (at + 1) + " / " + list.length + ")"; };
+    const show = (i) => { at = (i + list.length) % list.length; img.src = list[at].url; warm(at + 1); warm(at - 1); name.textContent = (list[at].name || "이름 없음") + (list[at].shop ? " · 상점 미구매" : list[at].owned === false ? " · 미획득" : "") + "  (" + (at + 1) + " / " + list.length + ")"; };
     const btn = (t, fn) => { const b = el("button", "", t); b.type = "button"; b.addEventListener("click", (e) => { e.stopPropagation(); fn(); }); return b; };
     bar.append(btn("◀", () => show(at - 1)), name, btn("▶", () => show(at + 1)), btn("닫기", () => v.remove()));
     v.append(img, bar);
