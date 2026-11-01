@@ -5,7 +5,7 @@
  *   POST /api/gacha-forge/more-money/status  오늘 남은 충전 횟수
  *   POST /api/gacha-forge/more-money/topup     충전(하루 3번): 에테르 · 자금 · 활력 · 글리머 · 소환권을 지갑에 넣음 (첫걸음 꾸러미는 세계마다 한 번만)
  *   POST /api/gacha-forge/more-money/exchange  에테르로 소환권 사기
- *   POST /api/gacha-forge/more-money/codex     도감용 적 이미지 · 전투 배경 · 세계의 모든 캐릭터 · 의상(미획득 · 상점 미구매 포함) · 메신저 사진 목록
+ *   POST /api/gacha-forge/more-money/codex     도감용 적 이미지 · 전투 배경 · 세계의 모든 캐릭터 · 의상(미획득 · 상점 미구매 · 다시 그리기 전 그림 포함) · 메신저 사진 목록
  *   POST /api/gacha-forge/more-money/pass/buy    주간 패스 구매(7일): 바로 받는 보상
  *   POST /api/gacha-forge/more-money/pass/claim  주간 패스 오늘 보상(하루 한 번, 7일 동안)
  * 충전 · 교환 · 주간 패스는 요청 번호(requestId)로 두 번 들어가지 않고, 최근 20건을 결제 내역으로 남깁니다.
@@ -150,8 +150,11 @@ function inject(src) {
     + `return await ${writeRun}(o,b,S)?{ok:!0,granted:__gmmPassDef.daily,receipt:rc,wallet:${pub}(M,S),tickets:__gmmTickets(M),pass:__gmmPass(S),history:__gmmHist(S)}:{ok:!1,error:"write-conflict"}}),`
     + `${router}.post("/more-money/codex",async p=>{${check}let c=await ${store}.getById(${pkg}.id,o+":combat-art"),d=c&&c.data||{},{data:S}=await ${readRun}(o),R=S&&S.roster||{},W=o+":unit:",U=[],F=[],N={},Ph=[],I={};`
     + `for(let M of await ${unitStore}.list(${unitPkg}.id,${unitKind})){if(!M||typeof M.id!="string"||!M.id.startsWith(W))continue;let _=M.data;if(!_||_.kind!=="character")continue;`
-    + `let own=!!(_.isProtagonist||R[M.id]),rar=Number(_.rarity)||0,nm=${str}(_.name);N[M.id.slice(W.length)]=nm;I[M.id]={nm,rar};${str}(_.portrait)&&U.push({id:M.id,key:M.id,name:nm,url:${str}(_.portrait),rarity:rar,kit:[${str}(_.affinity),${str}(_.role)].filter(Boolean).join(" "),owned:own});`
-    + `for(let x of ${outfitsOf}(_))${str}(x.url)&&F.push({key:x.id,unitId:M.id,name:nm,url:${str}(x.url),rarity:rar,kit:${str}(x.name),owned:own})}`
+    + `let own=!!(_.isProtagonist||R[M.id]),rar=Number(_.rarity)||0,nm=${str}(_.name),__gmmKit=[${str}(_.affinity),${str}(_.role)].filter(Boolean).join(" ");N[M.id.slice(W.length)]=nm;I[M.id]={nm,rar};${str}(_.portrait)&&U.push({id:M.id,key:M.id,name:nm,url:${str}(_.portrait),rarity:rar,kit:__gmmKit,owned:own});`
+    // Pictures drawn before a redraw (portrait and outfit history) are still in the world: list them after the current one.
+    + `let __gmmPu=new Set([${str}(_.portrait)]);for(let __gmmV of Array.isArray(_.portraitHistory)?_.portraitHistory:[]){let __gmmU=${str}(__gmmV&&__gmmV.url);if(!__gmmU||__gmmPu.has(__gmmU))continue;__gmmPu.add(__gmmU);U.push({id:M.id,key:M.id+"|"+__gmmU,name:nm,url:__gmmU,rarity:rar,kit:__gmmKit,owned:own,old:!0})}`
+    + `for(let x of ${outfitsOf}(_)){${str}(x.url)&&F.push({key:x.id,unitId:M.id,name:nm,url:${str}(x.url),rarity:rar,kit:${str}(x.name),owned:own});let __gmmOu=new Set([${str}(x.url)]);`
+    + `for(let __gmmV of Array.isArray(x.history)?x.history:[]){let __gmmU=${str}(__gmmV&&__gmmV.url);if(!__gmmU||__gmmOu.has(__gmmU))continue;__gmmOu.add(__gmmU);F.push({key:x.id+"|"+__gmmU,unitId:M.id,name:nm,url:__gmmU,rarity:rar,kit:${str}(x.name),owned:own,old:!0})}}}`
     // Outfits the shop has offered (every rotation so far) but not bought yet: they are not on the unit, so add them unowned.
     + `let FS=new Set(F.map(x=>x.key)),OP=o+":outfits:";for(let D of await ${unitStore}.list(${unitPkg}.id,"outfits")){if(!D||typeof D.id!="string"||!D.id.startsWith(OP))continue;`
     + `for(let x of Array.isArray(D.data&&D.data.picks)?D.data.picks:[]){let k=${str}(x&&x.id),uid=${str}(x&&x.unitId),iu=I[uid];if(!k||FS.has(k)||!${str}(x.url))continue;FS.add(k);`
