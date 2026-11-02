@@ -1,4 +1,4 @@
-/* Gacha More Money v1.10.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.11.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 글리머 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
@@ -914,7 +914,7 @@
 
   const TABS = [
     ["enemies", "적", false], ["units", "캐릭터", false], ["outfits", "의상", false],
-    ["story", "배경", true], ["battle", "전투 배경", true], ["cg", "CG", true], ["banner", "배너", true], ["bond", "인연 배경", true], ["photo", "메신저 사진", false],
+    ["story", "배경", true], ["battle", "전투 배경", true], ["cg", "CG", true], ["bondcg", "캐릭터 스토리 CG", true], ["banner", "배너", true], ["bond", "인연 배경", true], ["photo", "메신저 사진", false],
   ];
   let codex = null;
   // The codex sits outside .gf-arena, so it takes the arena's resolved --gmm-* tokens (the game's current style,
@@ -933,7 +933,7 @@
   }
   async function loadCodex(id) {
     // enemies / battle / photo stay null when the server patch is missing (the tabs then say so).
-    const out = { enemies: null, units: [], outfits: [], story: [], battle: null, cg: [], banner: [], bond: [], photo: null, error: "" };
+    const out = { enemies: null, units: [], outfits: [], story: [], battle: null, cg: [], bondcg: [], banner: [], bond: [], photo: null, error: "" };
     const [home, extra] = await Promise.allSettled([gf("/home-options", { runId: id }), gf("/more-money/codex", { runId: id })]);
     if (home.status === "fulfilled") {
       const d = home.value, bg = d.backgrounds || {};
@@ -950,7 +950,25 @@
       if (Array.isArray(extra.value.outfits)) out.outfits = extra.value.outfits.filter((x) => x.url).map((x) => ({ ...x, name: x.name + (x.kit ? " · " + x.kit : "") }));
     }
     else if (!unpatched(extra.reason)) out.error ||= "적 이미지를 불러오지 못했어요 (" + extra.reason.message + ").";
+    splitBondCg(out);
     return out;
+  }
+  // Character (bond) story CGs come in the same list as the main story's, keyed "<run>:cg:bond-<unit>[-<part>]:<scene>".
+  // They get their own tab, named after the character and in story order.
+  function splitBondCg(out) {
+    const re = /:cg:bond-(.+):(\d+)$/;
+    const who = new Map();
+    for (const u of out.units) { const slug = String(u.id || "").split(":unit:")[1]; if (slug && !who.has(slug)) who.set(slug, u.name); }
+    out.bondcg = out.cg.filter((x) => re.test(x.key || "")).map((x) => {
+      const [, ch, scene] = re.exec(x.key);
+      let slug = ch, part = 1;
+      const p = /^(.*)-(\d+)$/.exec(ch);
+      if (!who.has(slug) && p) { slug = p[1]; part = Number(p[2]); }
+      const unit = who.get(slug) || "";
+      const title = x.name && x.name !== x.key ? x.name : "";
+      return { ...x, name: [unit, part > 1 ? part + "부" : "", title].filter(Boolean).join(" · ") || "캐릭터 스토리", unit, part, scene: Number(scene) };
+    }).sort((a, b) => a.unit.localeCompare(b.unit, "ko") || a.part - b.part || a.scene - b.scene);
+    out.cg = out.cg.filter((x) => !re.test(x.key || ""));
   }
   let codexCache = null, codexLoading = null;
 
