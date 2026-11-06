@@ -1,9 +1,10 @@
-/* Gacha More Money v1.11.0 — personal extension for Gacha Forge 1.8.13 on Marinara Engine.
+/* Gacha More Money v1.12.0 — personal extension for Gacha Forge 1.27 on Marinara Engine 2.5.2.
  *  - 상점 → 충전소: 에테르 · 자금 · 활력 · 글리머 · 소환권 상품을 "결제"(진짜 돈은 나가지 않음)해 지갑에 넣습니다. 하루 3번.
  *  - 소환은 에테르 대신 소환권: 상시 배너는 성휘, 한정 배너는 월휘. 소환권은 에테르로 교환합니다.
  *  - 홈 로비 → [도감]: 적 · 캐릭터 · 의상 · 배경 · 전투 배경 · CG 이미지를 모아 봅니다.
  * The wallet lives in the game's own save, which no browser request can change, so the top-up and the enemy list
- * need the server patch in patch/apply-patch.mjs (POST /api/gacha-forge/more-money/*). Without it the shop shows
+ * need the server hook gacha-more-money-runtime.cjs (or the older file patch patch/apply-patch.mjs) for
+ * POST /api/gacha-forge/more-money/*. Without it the shop shows
  * how to apply it, and the codex still shows everything the game already serves (/home-options). */
 (() => {
   "use strict";
@@ -643,7 +644,7 @@
     const leftTag = el("span", "gmm-left"); leftTag.append("오늘 남은 충전 ", el("b", "", left == null ? "?" : String(left)), " / " + DAILY);
     top.append(el("span", "gmm-title", "충전소"), leftTag);
     mine.append(top);
-    if (patchMissing) mine.append(el("div", "gmm-msg", "충전하려면 서버 패치가 필요해요.\n마리나라를 끄고, 이 확장 폴더의 patch/apply-patch.mjs를 실행한 뒤 다시 켜 주세요.\n(자세한 방법은 README 참고)"));
+    if (patchMissing) mine.append(el("div", "gmm-msg", "충전하려면 서버 훅이 필요해요.\n마리나라 .env의 NODE_OPTIONS 맨 앞에 gacha-more-money-runtime.cjs를 --require로 넣고 다시 켜 주세요.\n(가챠 포지를 업데이트해도 다시 할 필요 없어요. 자세한 방법은 README 참고)"));
     if (lastNote) mine.append(el("div", "gmm-msg", lastNote));
     const h0 = el("h3", "", "주간 패스"); h0.append(el("small", "", "하루 " + DAILY + "번 충전과 따로 세요 · 끝나면 다시 살 수 있어요"));
     mine.append(h0, passCard());
@@ -1108,7 +1109,7 @@
     if (kept) { if (d.error) c.body.prepend(el("div", "cx-empty", d.error)); c.body.scrollTop = c.scroll.get(c.tab) || 0; return; }
     c.body.scrollTop = 0;
     if (d.error) c.body.append(el("div", "cx-empty", d.error));
-    if (list == null) { c.body.append(el("div", "cx-empty", "적 · 전투 배경 · 메신저 사진은 서버 패치가 있어야 볼 수 있어요.\n이 확장 폴더의 patch/apply-patch.mjs를 실행하고 마리나라를 다시 켜 주세요.")); return; }
+    if (list == null) { c.body.append(el("div", "cx-empty", "적 · 전투 배경 · 메신저 사진은 서버 훅이 있어야 볼 수 있어요.\n마리나라 .env의 NODE_OPTIONS에 gacha-more-money-runtime.cjs를 넣고 다시 켜 주세요.")); return; }
     if (!list.length) { c.body.append(el("div", "cx-empty", "아직 모은 그림이 없어요.\n게임을 진행하면 그려진 그림이 여기에 모여요.")); return; }
     const grid = el("div", "cx-grid" + (wide ? " wide" : ""));
     const frag = document.createDocumentFragment();

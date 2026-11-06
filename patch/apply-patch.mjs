@@ -23,42 +23,10 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 
-const PACKAGE_ID = "gacha-forge";
-const HEAD = "/*gacha-more-money:head*/";
-const START = "/*gacha-more-money:start*/";
-const END = "/*gacha-more-money:end*/";
-// The summon's aether payment is replaced in place; the original text rides along (base64) so --restore and
-// a re-run can put it back exactly.
-const SWAP = /\/\*gacha-more-money:swap:([A-Za-z0-9+/=]*)\*\/[\s\S]*?\/\*gacha-more-money:swapend\*\//g;
-
-// What each pack puts in the wallet (one summon used to cost 160 aether). Keep in sync with extension.js PACKS.
-// gmmTicketStd / gmmTicketLtd: standard and limited summon tickets, kept in the wallet beside aether.
-const PACKS = {
-  "aether-s": { aether: 1600 },
-  "aether-m": { aether: 4800 },
-  "aether-l": { aether: 9600 },
-  "funds-s": { funds: 100000 },
-  "funds-l": { funds: 300000 },
-  "vigor": { vigor: 60 },
-  "glimmer": { glimmer: 300 },
-  "ticket-std": { gmmTicketStd: 10 },
-  "ticket-ltd": { gmmTicketLtd: 10 },
-  "starter": { aether: 1600, funds: 50000, gmmTicketLtd: 1 },
-};
-const DAILY = 3;
-// Packs that can be bought only once per world (run), ever.
-const ONCE = ["starter"];
-// The weekly pass: bought once (again only after it ends), a gift at once, then a reward every day for 7 days
-// (the day it is bought counts as day 1). Days follow the Marinara server computer's local date.
-const PASS = { days: 7, buy: { gmmTicketLtd: 3 }, daily: { aether: 300, gmmTicketStd: 1 } };
-// Buying tickets with aether (any number of times): what it costs and what it gives.
-const EXCHANGE = {
-  "std-1": { cost: 160, give: { gmmTicketStd: 1 } },
-  "std-10": { cost: 1600, give: { gmmTicketStd: 10 } },
-  "ltd-1": { cost: 160, give: { gmmTicketLtd: 1 } },
-  "ltd-10": { cost: 1600, give: { gmmTicketLtd: 10 } },
-};
+// The patch itself lives in gmm-core.cjs, shared with the in-memory hook (gacha-more-money-runtime.cjs).
+const { PACKAGE_ID, START, strip, inject } = createRequire(import.meta.url)("./gmm-core.cjs");
 
 const args = process.argv.slice(2);
 const restore = args.includes("--restore");
@@ -71,108 +39,6 @@ function findDataDir() {
 }
 
 const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
-
-function strip(src) {
-  let out = src.replace(SWAP, (_, b64) => Buffer.from(b64, "base64").toString("utf8"));
-  const h = out.indexOf(HEAD);
-  if (h >= 0) { const e = out.indexOf(HEAD, h + HEAD.length); if (e < 0) throw new Error("머리 표식이 깨져 있습니다."); out = out.slice(0, h) + out.slice(e + HEAD.length); }
-  const s = out.indexOf(START);
-  if (s >= 0) { const e = out.indexOf(END, s); if (e < 0) throw new Error("패치 표식이 깨져 있습니다."); out = out.slice(0, s) + out.slice(e + END.length); }
-  return out;
-}
-
-// The game's code is minified and its names change between versions, so they are read off the shop's own
-// purchase handler (the same steps: check the run, lock it, read it, change the wallet, write it back).
-function inject(src) {
-  const need = (re, text, what) => { const m = re.exec(text); if (!m) throw new Error("이 가챠 포지 버전에서 " + what + "을(를) 찾지 못했습니다. 패치를 업데이트해야 합니다."); return m; };
-  const shop = need(/(\w+)\.post\("\/shop\/buy",async (\w+)=>\{let (\w+)=\2&&\2\.body\|\|\{\},\w+=(\w+)\(\3\.runId\)/, src, "상점 구매 처리");
-  const [, router, , , str] = shop;
-  const seg = src.slice(shop.index, shop.index + 2000);
-  const [, readIndex, hasRun] = need(/let\{data:\w+\}=await (\w+)\(\);if\(!(\w+)\(\w+,\w+\)\)return/, seg, "세계 확인");
-  const [, lock, readRun, norm, base] = need(/await (\w+)\(\w+\);let\{doc:\w+,data:\w+\}=await (\w+)\(\w+\),\w+=(\w+)\(\w+\.wallet\|\|\{\.\.\.(\w+)\},\w+\)/, seg, "지갑 읽기");
-  const [, writeRun] = need(/await (\w+)\(\w+,\w+,\w+\)\?\{ok:!0/, seg, "저장");
-  const [, pub] = need(/wallet:(\w+)\(\w+,\w+\)\}/, seg, "지갑 응답");
-  const [, store, pkg] = need(/await (\w+)\.getById\((\w+)\.id,\w+\(\w+\)\),\w+=\w+&&\w+\.data\|\|\{\};return\{enemies:/, src, "전투 이미지 저장소");
-  // The lobby's own character list (/home-options): where the world's units live and how a unit lists its outfits.
-  // The codex reads the same list without the "owned" filter, so units not pulled yet show too.
-  const home = need(/\.post\("\/home-options",async \w+=>\{[\s\S]{0,400}?await (\w+)\.list\((\w+)\.id,(\w+)\)/, src, "캐릭터 목록");
-  const [, unitStore, unitPkg, unitKind] = home;
-  const [, outfitsOf] = need(/for\(let \w+ of (\w+)\(\w+\)\)\w+\(\w+\.url\)&&\w+\.push\(\{key:\w+\.id,unitId/, src.slice(home.index, home.index + 2000), "의상 목록");
-  // The summon: which pool (standard / featured) and where it takes the aether.
-  const summon = need(/\w+\.post\("\/summon",async \w+=>\{/, src, "소환 처리");
-  const sseg = src.slice(summon.index, summon.index + 3000);
-  const [, pool] = need(/(\w+)=\w+\.split\("-"\)\[1\]==="standard"\?"standard":"featured"/, sseg, "소환 배너 종류");
-  const pay = need(/let (\w+)=\w+\*(\w+);if\(\(Number\((\w+)\.wallet\.aether\)\|\|0\)<\1\)return\{ok:!1,error:"insufficient-aether"\};\3\.wallet\.aether=\(Number\(\3\.wallet\.aether\)\|\|0\)-\1;/, sseg, "소환 비용");
-  const [payText, spent, count, run] = pay;
-  const ticketPay = `let ${spent}=0,__gmmT=${pool}==="standard"?"gmmTicketStd":"gmmTicketLtd",__gmmH=Math.max(0,Math.floor(Number(${run}.wallet[__gmmT])||0));`
-    + `if(__gmmH<${count})return{ok:!1,error:"insufficient-tickets",ticket:__gmmT,need:${count},held:__gmmH};${run}.wallet[__gmmT]=__gmmH-${count};`;
-  const swapped = "/*gacha-more-money:swap:" + Buffer.from(payText, "utf8").toString("base64") + "*/" + ticketPay + "/*gacha-more-money:swapend*/";
-
-  const head = HEAD + "const __gmmPacks=" + JSON.stringify(PACKS) + ",__gmmExchange=" + JSON.stringify(EXCHANGE) + ",__gmmPassDef=" + JSON.stringify(PASS) + ",__gmmDaily=" + DAILY + ",__gmmOnce=" + JSON.stringify(ONCE) + ";"
-    + "function __gmmDayNum(){let d=new Date();return Math.floor((d.getTime()-d.getTimezoneOffset()*6e4)/864e5)}"
-    + "function __gmmPass(S){let P=S&&S.moreMoneyPass,n=__gmmDayNum();if(!P||!Number.isFinite(Number(P.start)))return{active:!1,days:__gmmPassDef.days,rewards:__gmmPassDef};"
-    + "let st=Number(P.start),day=n-st+1,claimed=Array.isArray(P.claimed)?P.claimed.map(Number):[],active=day>=1&&day<=__gmmPassDef.days;"
-    + "return{active,day:active?day:0,days:__gmmPassDef.days,daysLeft:active?__gmmPassDef.days-day:0,claimedToday:claimed.includes(n),claimedDays:claimed.map(c=>c-st+1).filter(c=>c>=1&&c<=__gmmPassDef.days),rewards:__gmmPassDef}}"
-    + "function __gmmGive(M,G){for(let[c,q]of Object.entries(G))M[c]=(Number(M[c])||0)+q}"
-    + "function __gmmTickets(W){W=W||{};return{std:Math.max(0,Math.floor(Number(W.gmmTicketStd)||0)),ltd:Math.max(0,Math.floor(Number(W.gmmTicketLtd)||0))}}"
-    + "function __gmmToday(){let d=new Date();return d.getFullYear()+\"-\"+(d.getMonth()+1)+\"-\"+d.getDate()}"
-    + "function __gmmLeft(S){let day=__gmmToday(),m=S&&S.moreMoney,used=m&&m.day===day?Math.max(0,Number(m.count)||0):0;return{day,used,left:Math.max(0,__gmmDaily-used),daily:__gmmDaily}}"
-    // Receipts: every top-up, pass and exchange carries a requestId from the page. One already in the last 20 is not
-    // paid twice (a retry after a dropped connection answers with what happened the first time).
-    + "function __gmmRid(u){let r=u&&typeof u.requestId==\"string\"?u.requestId:\"\";return/^[A-Za-z0-9_-]{16,128}$/.test(r)?r:\"\"}"
-    + "function __gmmSeen(S,r){let L=S&&S.moreMoneyReceipts;return r&&Array.isArray(L)?L.find(x=>x&&x.requestId===r)||null:null}"
-    + "function __gmmLog(S,e){let L=Array.isArray(S.moreMoneyReceipts)?S.moreMoneyReceipts:[];S.moreMoneyReceipts=[e,...L].slice(0,20);return e}"
-    // One-time packs already bought; a purchase from before this list existed still shows in the receipts.
-    + "function __gmmBought(S){let B=Array.isArray(S&&S.moreMoneyOnce)?S.moreMoneyOnce.filter(x=>typeof x==\"string\"):[];for(let r of __gmmHist(S))if(r&&r.kind===\"topup\"&&__gmmOnce.includes(r.item)&&!B.includes(r.item))B.push(r.item);return B}"
-    + "function __gmmHist(S){return Array.isArray(S&&S.moreMoneyReceipts)?S.moreMoneyReceipts.slice(0,20):[]}"
-    + HEAD;
-  const check = `let u=p&&p.body||{},o=${str}(u.runId);if(!o)return{ok:!1,error:"bad-request"};let{data:g}=await ${readIndex}();if(!${hasRun}(g,o))return{ok:!1,error:"bad-request"};`;
-  const list = (obj) => `Object.entries(${obj}||{}).filter(([,v])=>v&&${str}(v.url)).map(([key,v])=>({key,name:${str}(v.name)||key,url:${str}(v.url)}))`;
-  // After the lock and the read: a requestId seen before answers with the state as it is now, changing nothing.
-  const replay = `let rid=__gmmRid(u),seen=__gmmSeen(S,rid);if(seen)return{ok:!0,replay:!0,receipt:seen,wallet:${pub}(M,S),tickets:__gmmTickets(M),pass:__gmmPass(S),history:__gmmHist(S),...__gmmLeft(S)};`;
-  const receipt = (kind, item, granted, spent) => `__gmmLog(S,{requestId:rid,kind:"${kind}",item:${item},granted:${granted},spent:${spent},at:Date.now(),aetherBefore:a0,aetherAfter:Number(M.aether)||0})`;
-  const routes = START
-    + `${router}.post("/more-money/status",async p=>{${check}let{data:S}=await ${readRun}(o);return{ok:!0,packs:__gmmPacks,exchange:__gmmExchange,tickets:__gmmTickets(S&&S.wallet),pass:__gmmPass(S),history:__gmmHist(S),once:__gmmOnce,bought:__gmmBought(S),...__gmmLeft(S)}}),`
-    + `${router}.post("/more-money/topup",async p=>{${check}let k=${str}(u.pack),P=Object.prototype.hasOwnProperty.call(__gmmPacks,k)?__gmmPacks[k]:null;if(!P)return{ok:!1,error:"bad-request"};`
-    + `await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),t=__gmmLeft(S),a0=Number(M.aether)||0;${replay}let B=__gmmBought(S);if(__gmmOnce.includes(k)&&B.includes(k))return{ok:!1,error:"already-bought",bought:B,...t};if(t.left<=0)return{ok:!1,error:"daily-limit",...t};`
-    + `for(let[c,q]of Object.entries(P))M[c]=(Number(M[c])||0)+q;S.moreMoney={day:t.day,count:t.used+1};if(__gmmOnce.includes(k))S.moreMoneyOnce=B=[...B,k];S.wallet=M;let rc=${receipt("topup", "k", "P", "0")};`
-    + `return await ${writeRun}(o,b,S)?{ok:!0,pack:k,granted:P,receipt:rc,wallet:${pub}(M,S),tickets:__gmmTickets(M),history:__gmmHist(S),bought:B,...__gmmLeft(S)}:{ok:!1,error:"write-conflict"}}),`
-    + `${router}.post("/more-money/exchange",async p=>{${check}let k=${str}(u.item),X=Object.prototype.hasOwnProperty.call(__gmmExchange,k)?__gmmExchange[k]:null;if(!X)return{ok:!1,error:"bad-request"};`
-    + `await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),h=Math.max(0,Number(M.aether)||0),a0=h;${replay}if(h<X.cost)return{ok:!1,error:"insufficient-aether",need:X.cost,held:h};`
-    + `M.aether=h-X.cost;for(let[c,q]of Object.entries(X.give))M[c]=(Number(M[c])||0)+q;S.wallet=M;let rc=${receipt("exchange", "k", "X.give", "X.cost")};`
-    + `return await ${writeRun}(o,b,S)?{ok:!0,item:k,spent:X.cost,granted:X.give,receipt:rc,wallet:${pub}(M,S),tickets:__gmmTickets(M),history:__gmmHist(S)}:{ok:!1,error:"write-conflict"}}),`
-    + `${router}.post("/more-money/pass/buy",async p=>{${check}await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),a0=Number(M.aether)||0;${replay}`
-    + `if(__gmmPass(S).active)return{ok:!1,error:"pass-active",pass:__gmmPass(S)};__gmmGive(M,__gmmPassDef.buy);S.moreMoneyPass={start:__gmmDayNum(),claimed:[]};S.wallet=M;let rc=${receipt("pass-buy", '"pass"', "__gmmPassDef.buy", "0")};`
-    + `return await ${writeRun}(o,b,S)?{ok:!0,granted:__gmmPassDef.buy,receipt:rc,wallet:${pub}(M,S),tickets:__gmmTickets(M),pass:__gmmPass(S),history:__gmmHist(S)}:{ok:!1,error:"write-conflict"}}),`
-    + `${router}.post("/more-money/pass/claim",async p=>{${check}await ${lock}(o);let{doc:b,data:S}=await ${readRun}(o),M=${norm}(S.wallet||{...${base}},S),P=__gmmPass(S),a0=Number(M.aether)||0;${replay}`
-    + `if(!P.active)return{ok:!1,error:"pass-inactive",pass:P};if(P.claimedToday)return{ok:!1,error:"pass-claimed",pass:P};__gmmGive(M,__gmmPassDef.daily);`
-    + `S.moreMoneyPass={...S.moreMoneyPass,claimed:[...(S.moreMoneyPass.claimed||[]),__gmmDayNum()]};S.wallet=M;let rc=${receipt("pass-claim", '"pass"', "__gmmPassDef.daily", "0")};`
-    + `return await ${writeRun}(o,b,S)?{ok:!0,granted:__gmmPassDef.daily,receipt:rc,wallet:${pub}(M,S),tickets:__gmmTickets(M),pass:__gmmPass(S),history:__gmmHist(S)}:{ok:!1,error:"write-conflict"}}),`
-    + `${router}.post("/more-money/codex",async p=>{${check}let c=await ${store}.getById(${pkg}.id,o+":combat-art"),d=c&&c.data||{},{data:S}=await ${readRun}(o),R=S&&S.roster||{},W=o+":unit:",U=[],F=[],N={},Ph=[],I={};`
-    + `for(let M of await ${unitStore}.list(${unitPkg}.id,${unitKind})){if(!M||typeof M.id!="string"||!M.id.startsWith(W))continue;let _=M.data;if(!_||_.kind!=="character")continue;`
-    + `let own=!!(_.isProtagonist||R[M.id]),rar=Number(_.rarity)||0,nm=${str}(_.name),__gmmKit=[${str}(_.affinity),${str}(_.role)].filter(Boolean).join(" ");N[M.id.slice(W.length)]=nm;I[M.id]={nm,rar};${str}(_.portrait)&&U.push({id:M.id,key:M.id,name:nm,url:${str}(_.portrait),rarity:rar,kit:__gmmKit,owned:own});`
-    // Pictures drawn before a redraw (portrait and outfit history) are still in the world: list them after the current one.
-    + `let __gmmPu=new Set([${str}(_.portrait)]);for(let __gmmV of Array.isArray(_.portraitHistory)?_.portraitHistory:[]){let __gmmU=${str}(__gmmV&&__gmmV.url);if(!__gmmU||__gmmPu.has(__gmmU))continue;__gmmPu.add(__gmmU);U.push({id:M.id,key:M.id+"|"+__gmmU,name:nm,url:__gmmU,rarity:rar,kit:__gmmKit,owned:own,old:!0})}`
-    + `for(let x of ${outfitsOf}(_)){${str}(x.url)&&F.push({key:x.id,unitId:M.id,name:nm,url:${str}(x.url),rarity:rar,kit:${str}(x.name),owned:own});let __gmmOu=new Set([${str}(x.url)]);`
-    + `for(let __gmmV of Array.isArray(x.history)?x.history:[]){let __gmmU=${str}(__gmmV&&__gmmV.url);if(!__gmmU||__gmmOu.has(__gmmU))continue;__gmmOu.add(__gmmU);F.push({key:x.id+"|"+__gmmU,unitId:M.id,name:nm,url:__gmmU,rarity:rar,kit:${str}(x.name),owned:own,old:!0})}}}`
-    // Outfits the shop has offered (every rotation so far) but not bought yet: they are not on the unit, so add them unowned.
-    + `let FS=new Set(F.map(x=>x.key)),OP=o+":outfits:";for(let D of await ${unitStore}.list(${unitPkg}.id,"outfits")){if(!D||typeof D.id!="string"||!D.id.startsWith(OP))continue;`
-    + `for(let x of Array.isArray(D.data&&D.data.picks)?D.data.picks:[]){let k=${str}(x&&x.id),uid=${str}(x&&x.unitId),iu=I[uid];if(!k||FS.has(k)||!${str}(x.url))continue;FS.add(k);`
-    + `F.push({key:k,unitId:uid,name:iu?iu.nm:${str}(x.unitName),url:${str}(x.url),rarity:iu?iu.rar:0,kit:${str}(x.name),owned:!1,shop:!0})}}`
-    // Messenger photos: the pictures characters sent in their chats (finished ones only), newest first.
-    + `let C=o+":chat:";for(let D of await ${unitStore}.list(${unitPkg}.id,"chat")){if(!D||typeof D.id!="string"||!D.id.startsWith(C))continue;let q=D.data||{},who=N[D.id.slice(C.length)]||${str}(q.name)||"메신저";`
-    + `for(let m of Array.isArray(q.messages)?q.messages:[]){let f=m&&m.photo;if(!f||f.pending||f.failed||!${str}(f.url)||!${str}(m.id))continue;Ph.push({key:D.id+"|"+m.id,name:who,url:${str}(f.url),at:Number(f.at||m.at)||0})}}`
-    + `Ph.sort((a,b)=>b.at-a.at);`
-    + `let srt=(a,b)=>b.rarity-a.rarity||(a.name<b.name?-1:1);U.sort(srt);F.sort(srt);`
-    + `return{ok:!0,enemies:${list("d.enemies")},battle:${list("d.modes")},units:U,outfits:F,photos:Ph}}),`
-    + END;
-  const payAt = summon.index + pay.index;
-  let out = src.slice(0, payAt) + swapped + src.slice(payAt + payText.length);
-  // The shop handler sits before or after the summon; find it again in the changed text.
-  const shopAt = out.indexOf(shop[0]);
-  out = out.slice(0, shopAt) + routes + out.slice(shopAt);
-  return head + out;
-}
 
 function syntaxCheck(code) {
   const dir = mkdtempSync(join(tmpdir(), "gmm-"));
